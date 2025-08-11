@@ -34,3 +34,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 추가로 무시할 파일/폴더
+readme.txt
+.env
+.git/
