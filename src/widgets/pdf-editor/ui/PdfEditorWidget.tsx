@@ -4,19 +4,48 @@ import { useState, useEffect, useRef } from 'react';
 import * as pdfjs from 'pdfjs-dist/build/pdf.mjs';
 //import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import { UploadCloud, File as FileIcon } from 'lucide-react';
+import { downloadPdf } from '@/shared/lib/pdf/downloadPdf';
+import type { PdfPage } from '@/entities/pdf-file/model/types';
 
 if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 }
 
 
+
+
+
 export function PdfEditorWidget() {
   const [file, setFile] = useState<File | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
-  const [pages, setPages] = useState<{id: string; pageNuber: number}[]>([]);
+  const [pages, setPages] = useState<PdfPage[]>([]);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+
+
+  function removePage(index: number) {
+    setPages(prev => prev.filter((_, i) => i !== index));
+  }
+  
+  function movePageUp(index: number) {
+    if (index === 0) return; // 첫 페이지면 위로 못 이동
+    setPages(prev => {
+      const newPages = [...prev];
+      [newPages[index - 1], newPages[index]] = [newPages[index], newPages[index - 1]];
+      return newPages;
+    });
+  }
+  
+  function movePageDown(index: number) {
+    setPages(prev => {
+      if (index === prev.length - 1) return prev; // 마지막 페이지면 아래로 못 이동
+      const newPages = [...prev];
+      [newPages[index], newPages[index + 1]] = [newPages[index + 1], newPages[index]];
+      return newPages;
+    });
+  }
+  
 
   function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const { files } = event.target;
@@ -48,35 +77,41 @@ export function PdfEditorWidget() {
 
         setNumPages(pdf.numPages);
 
-        // Wait for the state to update and canvases to be created in the next render
-        // This is a simplified approach; a more robust one might use a different effect
-        setTimeout(async () => {
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const scale = 1.5;
-            const viewport = page.getViewport({ scale });
-            
-            const canvas = document.createElement('canvas');
-            canvas.className = 'mb-4 shadow-lg';
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
+        const pageList: PdfPage[] = [];
 
-            if (context && canvasContainerRef.current) {
-              canvasContainerRef.current.appendChild(canvas);
-              const renderContext = {
-                canvasContext: context,
-                viewport: viewport,
-              };
-              await page.render(renderContext as any);
-            }
+        for(let i = 1; i<=pdf.numPages; i++){
+          const page = await pdf.getPage(i);
+          const scale = 1.5;
+          const viewport = page.getViewport({scale})
+
+          const canvas = document.createElement('canvas');
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+          const context = canvas.getContext('2d');
+
+          if(context){
+            await page.render({canvasContext: context, viewport}).promise;
           }
-          setIsLoading(false);
-        }, 100); // A small delay to allow React to render the container
 
+          canvasContainerRef.current?.appendChild(canvas);
+
+          pageList.push({
+            id: `page-${i}`,
+            pageNumber: i,
+            canvas,
+            imageUrl: canvas.toDataURL(),
+          });
+
+        }
+        setPages(pageList);
+        setIsLoading(false);
+       
       } catch (error: any) {
         console.error('Error loading or rendering PDF:', error);
         setPdfError(`PDF 파일을 불러오는 데 실패했습니다: ${error.message}`);
+        setIsLoading(false);
+      }
+      finally {
         setIsLoading(false);
       }
     };
@@ -128,7 +163,33 @@ export function PdfEditorWidget() {
             </button>
           </div>
           {isLoading && <p className="text-center">PDF를 렌더링 중입니다...</p>}
-          <div ref={canvasContainerRef} className="max-h-[70vh] overflow-y-auto bg-gray-200 dark:bg-gray-900 p-4 rounded-lg" />
+
+          <div className='pdf-pages'>
+
+            {pages.map((page, index) => (
+              <div key = {page.id} className='pdf-page'>
+                <img src= {page.imageUrl} alt={`Page ${page.pageNumber}`}></img>
+                <button onClick={() => removePage(index)}>삭제</button>
+                <button onClick={() => movePageUp(index)}>위로</button>
+                <button onClick={() => movePageDown(index)}>아래로</button>
+              </div>
+            ))}
+
+
+          </div>
+          
+          {!isLoading && pages.length > 0 && (
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => downloadPdf(pages, file?.name)}
+                className="w-full rounded-lg bg-green-600 px-6 py-3 text-lg font-semibold text-white shadow-md hover:bg-green-700 transition-colors"
+              >
+                PDF 다운로드
+              </button>
+            </div>
+          )}
+
+
           {!isLoading && numPages > 0 && (
             <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
               총 {numPages} 페이지
