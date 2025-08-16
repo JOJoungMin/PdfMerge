@@ -3,3 +3,10 @@ export interface PdfFileItemprops{
     index: number;
     handleRemoveFile: (index: number) => void;
 }
+
+export interface PdfPage {
+    id: string;
+    pageNumber: number;
+    canvas?: HTMLCanvasElement;
+    imageUrl?: string;
+  }
