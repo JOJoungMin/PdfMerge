@@ -3,6 +3,7 @@
 
 import { useState, useRef } from 'react';
 import { Upload, File as FileIcon, X } from 'lucide-react';
+import PdfFileItem from '@/entities/pdf-file/ui/PdfFileItem';
 
 export function PdfMergeWidget() {
   // 선택된 파일들을 File 객체 배열로 관리합니다.
@@ -111,15 +112,8 @@ export function PdfMergeWidget() {
           <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">선택된 파일 ({selectedFiles.length})</h2>
           <ul className="mt-2 space-y-2">
             {selectedFiles.map((file, index) => (
-              <li key={index} className="flex items-center justify-between rounded-md bg-gray-100 p-3 dark:bg-gray-700">
-                <div className="flex min-w-0 items-center">
-                  <FileIcon className="mr-2 h-5 w-5 flex-shrink-0 text-blue-500" />
-                  <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">{file.name}</span>
-                </div>
-                <button onClick={() => handleRemoveFile(index)} className="ml-2 flex-shrink-0 text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400">
-                  <X className="h-5 w-5" />
-                </button>
-              </li>
+              
+              <PdfFileItem file={file} index={index} handleRemoveFile={handleRemoveFile}></PdfFileItem>
             ))}
           </ul>
         </div>
