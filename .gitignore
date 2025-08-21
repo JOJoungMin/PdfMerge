@@ -39,3 +39,6 @@ next-env.d.ts
 readme.txt
 .env
 .git/
+
+/src/generated/prisma
+/data

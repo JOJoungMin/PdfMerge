@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: your_strong_password # 나중에 .env 파일로 옮겨 안전하게 관리합니다.
+      MYSQL_DATABASE: my_pdf_app_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./data/db:/var/lib/mysql
