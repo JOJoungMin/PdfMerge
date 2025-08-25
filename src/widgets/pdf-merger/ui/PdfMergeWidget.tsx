@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useRef } from 'react';
-import { Upload, File as FileIcon, X } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import PdfFileItem from '@/entities/pdf-file/ui/PdfFileItem';
 
 export function PdfMergeWidget() {
@@ -68,8 +68,12 @@ export function PdfMergeWidget() {
             setSelectedFiles([]);
 
 
-    }catch (e: any) {
-        setError(e.message);
+    }catch (e: unknown) {
+        if (e instanceof Error) {
+          setError(e.message);
+        } else {
+          setError('알 수 없는 오류가 발생했습니다.');
+        }
       } finally {
         setIsMerging(false);
       }
@@ -113,7 +117,7 @@ export function PdfMergeWidget() {
           <ul className="mt-2 space-y-2">
             {selectedFiles.map((file, index) => (
               
-              <PdfFileItem file={file} index={index} handleRemoveFile={handleRemoveFile}></PdfFileItem>
+              <PdfFileItem key={file.name + index} file={file} index={index} handleRemoveFile={handleRemoveFile}></PdfFileItem>
             ))}
           </ul>
         </div>

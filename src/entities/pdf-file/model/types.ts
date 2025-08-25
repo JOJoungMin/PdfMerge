@@ -9,4 +9,6 @@ export interface PdfPage {
     pageNumber: number;
     canvas?: HTMLCanvasElement;
     imageUrl?: string;
+    width: number;
+    height: number;
   }

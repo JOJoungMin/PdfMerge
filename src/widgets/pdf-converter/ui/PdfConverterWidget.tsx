@@ -5,6 +5,7 @@ import { UploadCloud, File as FileIcon, Download, Image as ImageIcon, FileArchiv
 import * as pdfjs from 'pdfjs-dist/build/pdf.mjs';
 //import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import JSZip from 'jszip';
+import Image from 'next/image';
 
 if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
@@ -13,6 +14,8 @@ if (typeof window !== 'undefined') {
 type ConvertedImage = {
   fileName: string;
   dataUrl: string;
+  width: number;
+  height: number;
 };
 
 export function PdfConverterWidget() {
@@ -60,13 +63,19 @@ export function PdfConverterWidget() {
         images.push({
           fileName: `${file.name.replace(/\.pdf$/i, '')}_page_${i}.${targetFormat}`,
           dataUrl: dataUrl,
+          width: viewport.width,
+          height: viewport.height,
         });
       }
 
       setConvertedImages(images);
 
-    } catch (e: any) {
-      setError('PDF를 변환하는 중 오류가 발생했습니다: ' + e.message);
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        setError('PDF를 변환하는 중 오류가 발생했습니다: ' + e.message);
+      } else {
+        setError('알 수 없는 오류가 발생했습니다.');
+      }
       console.error(e);
     } finally {
       setIsConverting(false);
@@ -96,8 +105,12 @@ export function PdfConverterWidget() {
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href);
 
-    } catch (e: any) {
-      setError('ZIP 파일 생성 중 오류가 발생했습니다: ' + e.message);
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        setError('ZIP 파일 생성 중 오류가 발생했습니다: ' + e.message);
+      } else {
+        setError('알 수 없는 오류가 발생했습니다.');
+      }
       console.error(e);
     } finally {
       setIsZipping(false);
@@ -147,13 +160,13 @@ export function PdfConverterWidget() {
           <div className="my-6">
             <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">변환할 포맷 선택</label>
             <div className="flex justify-center space-x-4">
-              <button onClick={() => setTargetFormat('png')} 
+              <button onClick={() => setTargetFormat('png')}
               className={`px-4 py-2 rounded-lg ${
                 targetFormat === 'png'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white'
               }`}>PNG로 변환</button>
-              <button onClick={() => setTargetFormat('jpeg')} 
+              <button onClick={() => setTargetFormat('jpeg')}
               className={`px-4 py-2 rounded-lg ${
                 targetFormat === 'jpeg'
                   ? 'bg-blue-600 text-white'
@@ -190,7 +203,7 @@ export function PdfConverterWidget() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-h-96 overflow-y-auto p-4 bg-gray-100 dark:bg-gray-900 rounded-lg">
                 {convertedImages.map((image, index) => (
                   <a key={index} href={image.dataUrl} download={image.fileName} className="block p-2 bg-white dark:bg-gray-700 rounded-lg shadow hover:shadow-lg transition-shadow">
-                    <img src={image.dataUrl} alt={image.fileName} className="w-full h-auto rounded" />
+                    <Image src={image.dataUrl} alt={image.fileName} width={image.width} height={image.height} className="w-full h-auto rounded" />
                     <p className="text-xs mt-2 truncate">{image.fileName}</p>
                     <Download className="w-4 h-4 mx-auto mt-1" />
                   </a>

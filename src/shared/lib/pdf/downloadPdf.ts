@@ -22,7 +22,9 @@ export async function downloadPdf(pages: PdfPage[], fileName?: string) {
   }
 
   const pdfBytes = await pdfDoc.save();
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  // Create a new Uint8Array copy to satisfy the Blob constructor's type requirements.
+  const newPdfBytes = new Uint8Array(pdfBytes);
+  const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement('a');

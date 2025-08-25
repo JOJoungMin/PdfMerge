@@ -6,14 +6,11 @@ import * as pdfjs from 'pdfjs-dist/build/pdf.mjs';
 import { UploadCloud, File as FileIcon } from 'lucide-react';
 import { downloadPdf } from '@/shared/lib/pdf/downloadPdf';
 import type { PdfPage } from '@/entities/pdf-file/model/types';
+import Image from 'next/image';
 
 if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 }
-
-
-
-
 
 export function PdfEditorWidget() {
   const [file, setFile] = useState<File | null>(null);
@@ -100,15 +97,21 @@ export function PdfEditorWidget() {
             pageNumber: i,
             canvas,
             imageUrl: canvas.toDataURL(),
+            width: viewport.width,
+            height: viewport.height,
           });
 
         }
         setPages(pageList);
         setIsLoading(false);
        
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error loading or rendering PDF:', error);
-        setPdfError(`PDF 파일을 불러오는 데 실패했습니다: ${error.message}`);
+        if (error instanceof Error) {
+          setPdfError(`PDF 파일을 불러오는 데 실패했습니다: ${error.message}`);
+        } else {
+          setPdfError('알 수 없는 오류가 발생했습니다.');
+        }
         setIsLoading(false);
       }
       finally {
@@ -168,7 +171,7 @@ export function PdfEditorWidget() {
 
             {pages.map((page, index) => (
               <div key = {page.id} className='pdf-page'>
-                <img src= {page.imageUrl} alt={`Page ${page.pageNumber}`}></img>
+                {page.imageUrl && <Image src={page.imageUrl} alt={`Page ${page.pageNumber}`} width={page.width} height={page.height} />} 
                 <button onClick={() => removePage(index)}>삭제</button>
                 <button onClick={() => movePageUp(index)}>위로</button>
                 <button onClick={() => movePageDown(index)}>아래로</button>

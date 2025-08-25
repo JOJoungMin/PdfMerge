@@ -41,4 +41,10 @@ readme.txt
 .git/
 
 /src/generated/prisma
-/data
+data/db/mysql.sock
+
+
+# local env files
+.env*.local
+.env
+.env.production

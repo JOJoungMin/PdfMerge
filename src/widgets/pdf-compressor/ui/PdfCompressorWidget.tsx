@@ -70,8 +70,8 @@ export function PdfCompressorWidget() {
 
       const pdfBytes = await newPdfDoc.save();
       setCompressedSize(pdfBytes.length);
-
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const newPdfBytes = new Uint8Array(pdfBytes);
+      const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -81,8 +81,12 @@ export function PdfCompressorWidget() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-    } catch (e: any) {
-      setError('PDF를 압축하는 중 오류가 발생했습니다: ' + e.message);
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        setError('PDF를 압축하는 중 오류가 발생했습니다: ' + e.message);
+      } else {
+        setError('알 수 없는 오류가 발생했습니다.');
+      }
       console.error(e);
     } finally {
       setIsCompressing(false);
