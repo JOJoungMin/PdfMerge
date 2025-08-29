@@ -6,7 +6,8 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -57,4 +58,22 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+enum OperationType{
+  MERGE
+  COMPRESS
+  CONVERT_TO_IMAGE
+  EDIT
+}
+
+model PerformanceLog {
+  id                      String        @id @default(cuid())
+  operationType           OperationType // 어떤 작업이었는지 (병합, 압축, 변환 등)
+  fileCount               Int           // 처리한 파일 개수
+  totalInputSizeInBytes   BigInt        // 총 입력 파일 크기 (bytes)
+  outputSizeInBytes       BigInt?       // 결과물 파일 크기 (압축률 등을 위해)
+  processingTimeInMs      Int           // 처리 소요 시간 (밀리초)
+  createdAt               DateTime      @default(now()) // 기록된 시간
+  githubVersion           String?       // GitHub 버전 (선택 사항)
 }
