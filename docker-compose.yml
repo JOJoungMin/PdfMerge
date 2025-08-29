@@ -1,12 +1,36 @@
 version: '3.8'
 services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+    # 로컬 개발 시 소스 코드 변경을 즉시 반영하기 위한 볼륨 설정
+    # .:/app 은 현재 디렉토리를 컨테이너의 /app에 마운트합니다.
+    # /app/node_modules 와 /app/.next 는 호스트의 폴더가 컨테이너의 폴더를 덮어쓰는 것을 방지합니다.
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+
   db:
     image: mysql:8.0
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: your_strong_password # 나중에 .env 파일로 옮겨 안전하게 관리합니다.
-      MYSQL_DATABASE: my_pdf_app_db
+      # .env 파일에 정의된 변수를 참조합니다.
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:
       - "3307:3306"
     volumes:
-      - ../mysql-data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
+
+# 데이터베이스 데이터를 영속적으로 저장하기 위한 명명된 볼륨
+volumes:
+  mysql-data:

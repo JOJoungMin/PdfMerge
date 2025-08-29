@@ -1,28 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { UploadCloud, File as FileIcon, Download, Image as ImageIcon, FileArchive } from 'lucide-react';
-import * as pdfjs from 'pdfjs-dist/build/pdf.mjs';
-//import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
-import JSZip from 'jszip';
-import Image from 'next/image';
-
-if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-}
-
-type ConvertedImage = {
-  fileName: string;
-  dataUrl: string;
-  width: number;
-  height: number;
-};
+import { UploadCloud, File as FileIcon, Download, Image as ImageIcon } from 'lucide-react';
 
 export function PdfConverterWidget() {
   const [file, setFile] = useState<File | null>(null);
   const [isConverting, setIsConverting] = useState<boolean>(false);
-  const [isZipping, setIsZipping] = useState<boolean>(false);
-  const [convertedImages, setConvertedImages] = useState<ConvertedImage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [targetFormat, setTargetFormat] = useState<'png' | 'jpeg'>('png');
 
@@ -30,7 +13,6 @@ export function PdfConverterWidget() {
     const { files } = event.target;
     if (files && files[0]) {
       setFile(files[0]);
-      setConvertedImages([]);
       setError(null);
     }
   }
@@ -40,35 +22,31 @@ export function PdfConverterWidget() {
 
     setIsConverting(true);
     setError(null);
-    setConvertedImages([]);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('targetFormat', targetFormat);
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjs.getDocument(arrayBuffer).promise;
-      const images: ConvertedImage[] = [];
+      const response = await fetch('/api/pdf-convert', {
+        method: 'POST',
+        body: formData,
+      });
 
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better quality
-
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const context = canvas.getContext('2d');
-        if (!context) throw new Error('Canvas 2D context not available.');
-
-        await page.render({ canvasContext: context, viewport }).promise;
-
-        const dataUrl = canvas.toDataURL(`image/${targetFormat}`);
-        images.push({
-          fileName: `${file.name.replace(/\.pdf$/i, '')}_page_${i}.${targetFormat}`,
-          dataUrl: dataUrl,
-          width: viewport.width,
-          height: viewport.height,
-        });
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'PDF 변환에 실패했습니다.');
       }
 
-      setConvertedImages(images);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `converted-${file.name.replace('.pdf', '')}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
     } catch (e: unknown) {
       if (e instanceof Error) {
@@ -79,41 +57,6 @@ export function PdfConverterWidget() {
       console.error(e);
     } finally {
       setIsConverting(false);
-    }
-  }
-
-  async function handleDownloadZip() {
-    if (convertedImages.length === 0) return;
-
-    setIsZipping(true);
-    try {
-      const zip = new JSZip();
-      for (const image of convertedImages) {
-        // data:image/png;base64,iVBORw0KGgoAAAANSUhEUg... -> iVBORw0KGgoAAAANSUhEUg...
-        const base64Data = image.dataUrl.split(',')[1];
-        zip.file(image.fileName, base64Data, { base64: true });
-      }
-
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const zipFileName = `${file?.name.replace(/\.pdf$/i, '')}_images.zip`;
-
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(zipBlob);
-      link.download = zipFileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
-
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        setError('ZIP 파일 생성 중 오류가 발생했습니다: ' + e.message);
-      } else {
-        setError('알 수 없는 오류가 발생했습니다.');
-      }
-      console.error(e);
-    } finally {
-      setIsZipping(false);
     }
   }
 
@@ -146,13 +89,13 @@ export function PdfConverterWidget() {
       {file && (
         <div className="text-center">
           <div className="flex justify-between items-center mb-4 p-3 rounded-md bg-gray-100 dark:bg-gray-700">
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0">
               <FileIcon className="mr-2 h-5 w-5 flex-shrink-0 text-blue-500" />
               <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">
                 {file.name}
               </span>
             </div>
-            <button onClick={() => setFile(null)} className="text-sm text-blue-600 hover:underline">
+            <button onClick={() => setFile(null)} className="text-sm text-blue-600 hover:underline flex-shrink-0 ml-2">
               파일 변경
             </button>
           </div>
@@ -161,56 +104,24 @@ export function PdfConverterWidget() {
             <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">변환할 포맷 선택</label>
             <div className="flex justify-center space-x-4">
               <button onClick={() => setTargetFormat('png')}
-              className={`px-4 py-2 rounded-lg ${
-                targetFormat === 'png'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white'
-              }`}>PNG로 변환</button>
+              className={`px-4 py-2 rounded-lg ${targetFormat === 'png' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white'}`}>
+                PNG로 변환
+              </button>
               <button onClick={() => setTargetFormat('jpeg')}
-              className={`px-4 py-2 rounded-lg ${
-                targetFormat === 'jpeg'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white'
-              }`}>JPG로 변환</button>
-              <button className="px-4 py-2 rounded-lg bg-yellow-300 text-black">
-  어딨어
-</button>
+              className={`px-4 py-2 rounded-lg ${targetFormat === 'jpeg' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white'}`}>
+                JPG로 변환
+              </button>
             </div>
           </div>
 
           <button
             onClick={handleConvert}
-            disabled={isConverting || isZipping}
+            disabled={isConverting}
             className="w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400"
           >
-            {isConverting
-              ? '변환 중...'
-              : `${targetFormat.toUpperCase()}로 변환하기`}
+            {isConverting ? '변환 중...' : `${targetFormat.toUpperCase()}로 변환 및 다운로드`}
             <ImageIcon className="ml-3 -mr-1 h-5 w-5" />
           </button>
-
-          {convertedImages.length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-xl font-semibold mb-4">변환 결과</h3>
-              <button
-                onClick={handleDownloadZip}
-                disabled={isZipping || isConverting}
-                className="w-full mb-4 inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400"
-              >
-                {isZipping ? 'ZIP 파일 생성 중...' : '모두 ZIP으로 다운로드'}
-                <FileArchive className="ml-3 -mr-1 h-5 w-5" />
-              </button>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-h-96 overflow-y-auto p-4 bg-gray-100 dark:bg-gray-900 rounded-lg">
-                {convertedImages.map((image, index) => (
-                  <a key={index} href={image.dataUrl} download={image.fileName} className="block p-2 bg-white dark:bg-gray-700 rounded-lg shadow hover:shadow-lg transition-shadow">
-                    <Image src={image.dataUrl} alt={image.fileName} width={image.width} height={image.height} className="w-full h-auto rounded" />
-                    <p className="text-xs mt-2 truncate">{image.fileName}</p>
-                    <Download className="w-4 h-4 mx-auto mt-1" />
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

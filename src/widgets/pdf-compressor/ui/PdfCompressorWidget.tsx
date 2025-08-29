@@ -2,30 +2,21 @@
 
 import { useState } from 'react';
 import { UploadCloud, File as FileIcon, Download } from 'lucide-react';
-import { PDFDocument } from 'pdf-lib';
-import * as pdfjs from 'pdfjs-dist/build/pdf.mjs';
-//import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
-
-if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-}
-
 
 export function PdfCompressorWidget() {
   const [file, setFile] = useState<File | null>(null);
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
-  const [compressedSize, setCompressedSize] = useState<number | null>(null);
-  const [originalSize, setOriginalSize] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [quality, setQuality] = useState<number>(0.7); // Default quality
+
+  const [compressionResult, setCompressionResult] = useState<{ originalSize: number, compressedSize: number, reduction: string } | null>(null);
 
   function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const { files } = event.target;
     if (files && files[0]) {
       setFile(files[0]);
-      setOriginalSize(files[0].size);
-      setCompressedSize(null);
       setError(null);
+      setCompressionResult(null);
     }
   }
 
@@ -34,44 +25,30 @@ export function PdfCompressorWidget() {
 
     setIsCompressing(true);
     setError(null);
-    setCompressedSize(null);
+    setCompressionResult(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('quality', quality.toString());
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjs.getDocument(arrayBuffer).promise;
-      const newPdfDoc = await PDFDocument.create();
+      const response = await fetch('/api/pdf-compress', {
+        method: 'POST',
+        body: formData,
+      });
 
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 1.5 }); // Using a fixed scale for rendering
-
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const context = canvas.getContext('2d');
-
-        if (!context) {
-          throw new Error('Could not get canvas context');
-        }
-
-        await page.render({ canvasContext: context, viewport: viewport }).promise;
-
-        const jpgDataUrl = canvas.toDataURL('image/jpeg', quality);
-        const jpgImage = await newPdfDoc.embedJpg(jpgDataUrl);
-
-        const newPage = newPdfDoc.addPage([jpgImage.width, jpgImage.height]);
-        newPage.drawImage(jpgImage, {
-          x: 0,
-          y: 0,
-          width: newPage.getWidth(),
-          height: newPage.getHeight(),
-        });
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'PDF 압축에 실패했습니다.');
       }
 
-      const pdfBytes = await newPdfDoc.save();
-      setCompressedSize(pdfBytes.length);
-      const newPdfBytes = new Uint8Array(pdfBytes);
-      const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
+      const blob = await response.blob();
+      const originalSize = file.size;
+      const compressedSize = blob.size;
+      const reduction = (((originalSize - compressedSize) / originalSize) * 100).toFixed(2);
+
+      setCompressionResult({ originalSize, compressedSize, reduction });
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -122,13 +99,13 @@ export function PdfCompressorWidget() {
       {file && (
         <div className="text-center">
           <div className="flex justify-between items-center mb-4 p-3 rounded-md bg-gray-100 dark:bg-gray-700">
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0">
               <FileIcon className="mr-2 h-5 w-5 flex-shrink-0 text-blue-500" />
               <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">
                 {file.name}
               </span>
             </div>
-            <button onClick={() => setFile(null)} className="text-sm text-blue-600 hover:underline">
+            <button onClick={() => setFile(null)} className="text-sm text-blue-600 hover:underline flex-shrink-0 ml-2">
               파일 변경
             </button>
           </div>
@@ -153,16 +130,16 @@ export function PdfCompressorWidget() {
             disabled={isCompressing}
             className="w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:bg-gray-400"
           >
-            {isCompressing ? '압축 중...' : '압축하기'}
+            {isCompressing ? '압축 중...' : '압축 및 다운로드'}
             <Download className="ml-3 -mr-1 h-5 w-5" />
           </button>
 
-          {originalSize && compressedSize && (
-            <div className="mt-6 text-lg">
-              <p>원본 크기: <span className="font-mono">{(originalSize / 1024 / 1024).toFixed(2)} MB</span></p>
-              <p>압축된 크기: <span className="font-mono">{(compressedSize / 1024 / 1024).toFixed(2)} MB</span></p>
+          {compressionResult && (
+            <div className="mt-6 text-lg space-y-2">
+              <p>원본 크기: <span className="font-mono">{(compressionResult.originalSize / 1024 / 1024).toFixed(2)} MB</span></p>
+              <p>압축된 크기: <span className="font-mono">{(compressionResult.compressedSize / 1024 / 1024).toFixed(2)} MB</span></p>
               <p className="font-bold text-green-600">
-                감소량: {(((originalSize - compressedSize) / originalSize) * 100).toFixed(2)}%
+                감소량: {compressionResult.reduction}%
               </p>
             </div>
           )}

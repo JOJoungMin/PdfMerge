@@ -36,9 +36,13 @@ export function AuthStatus() {
 
   return (
     <Link href="/login">
-      <button className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-        로그인
-      </button>
+     <button
+  className="px-4 py-2 text-sm font-semibold text-black bg-yellow-300 rounded-lg hover:bg-yellow-400"
+>
+  로그인
+</button>
+
+
     </Link>
   );
 }

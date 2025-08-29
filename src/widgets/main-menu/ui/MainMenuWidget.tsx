@@ -41,19 +41,23 @@ export function MainMenuWidget() {
         <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">필요한 도구를 선택하세요.</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {tools.map((tool) => (
-          <Link href={tool.href} key={tool.name}>
-            <div className="flex items-center p-6 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-lg">
-              <div className={`p-4 rounded-full ${tool.bgColor} mr-6`}>
-                <tool.icon className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800 dark:text-white">{tool.name}</h2>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">{tool.description}</p>
-              </div>
-            </div>
-          </Link>
-        ))}
+      {tools.map((tool) => {
+  const Icon = tool.icon; // 정상
+  return (
+    <Link href={tool.href} key={tool.name}>
+      <div className="flex items-center p-6 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-lg">
+        <div className={`p-4 rounded-full ${tool.bgColor} mr-6`}>
+          <Icon className="h-8 w-8 text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">{tool.name}</h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{tool.description}</p>
+        </div>
+      </div>
+    </Link>
+  );
+})}
+
       </div>
     </div>
   );

@@ -32,7 +32,12 @@ export default function RootLayout({
                       <span>PDF-Utils</span>
                     </Link>
                   </div>
-                  <AuthStatus />
+                  <div className="flex items-center gap-4">
+                    <Link href="/admin" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200">
+                      Admin
+                    </Link>
+                    <AuthStatus />
+                  </div>
                 </div>
               </nav>
             </header>
