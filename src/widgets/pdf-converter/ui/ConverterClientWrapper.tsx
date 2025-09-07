@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 
 const PdfConverterWidget = dynamic(
-  () => import('./PdfConverterWidget').then(mod => mod.PdfConverterWidget),
+  () => import('./PdfConverterWidget'),
   {
     ssr: false,
     loading: () => <p>Loading PDF Converter...</p>

@@ -1,41 +1,49 @@
-# 1. Base Image
-# Node.js 18-slim 버전을 기반으로 합니다. 가볍고 필요한 대부분의 도구를 포함하고 있습니다.
-FROM node:18-slim
+# ======================================================================================
+# STAGE 1: Builder
+# - 소스 코드를 빌드하고, 운영에 필요한 최소한의 결과물을 생성하는 단계
+# ======================================================================================
+FROM node:18-slim AS builder
 
-# Install git for version info
-RUN apt-get update && apt-get install -y git --no-install-recommends && \
+# 시스템 패키지 업데이트 및 ghostscript, poppler-utils 설치
+RUN apt-get update && apt-get install -y \
+    ghostscript \
+    poppler-utils \
+    --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# 2. Install Ghostscript
-# apt-get 패키지 매니저를 업데이트하고 ghostscript를 설치합니다.
-# -y 플래그는 모든 프롬프트에 자동으로 yes라고 답해줍니다.
-# --no-install-recommends는 불필요한 추천 패키지를 설치하지 않아 이미지를 가볍게 유지합니다.
-RUN apt-get update && apt-get install -y ghostscript --no-install-recommends && \
-    # 캐시 정리하여 최종 이미지 크기를 줄입니다.
-    rm -rf /var/lib/apt/lists/*
-
-# Set Git commit hash as an environment variable for the dev server
-RUN echo "NEXT_PUBLIC_GIT_COMMIT_SHA=$(git rev-parse HEAD)" > .env.local
-
-# 3. Set Working Directory
-
-# 컨테이너 내부에서 작업할 디렉토리를 설정합니다.
 WORKDIR /app
 
-# 4. Copy package files and Install Dependencies
-# 소스 코드를 복사하기 전에 package.json 파일을 먼저 복사하여 의존성을 설치합니다.
-# 이렇게 하면 소스 코드가 변경되어도 의존성이 바뀌지 않았다면 Docker는 캐시된 레이어를 사용해 빌드 시간을 단축합니다.
+# 의존성 설치
+COPY package*.json ./
+RUN npm install
+
+# 소스 코드 복사 및 빌드
 COPY . .
-COPY test_files /app/test_files
-RUN npm install && npx prisma generate
+RUN npx prisma generate
+RUN npm run build
 
-# 6. Build the App
-# 프로덕션용으로 Next.js 애플리케이션을 빌드합니다.
+# ======================================================================================
+# STAGE 2: Runner
+# - 빌드된 결과물만 가져와 실제 애플리케이션을 실행하는 단계
+# - 빌드에만 필요했던 소스코드나 개발용 패키지가 포함되지 않아 가볍고 안전함
+# ======================================================================================
+FROM node:18-slim AS runner
 
-# 7. Expose Port
-# 컨테이너가 3000번 포트를 외부에 노출하도록 설정합니다.
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# 런타임에 필요한 ghostscript만 설치
+RUN apt-get update && apt-get install -y ghostscript --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
+# Builder 스테이지에서 생성된 빌드 결과물만 복사
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/test_files ./test_files
+
 EXPOSE 3000
 
-# 8. Set Default Command
-# 컨테이너가 시작될 때 실행될 기본 명령어를 설정합니다.
-CMD ["npm", "run", "dev"]
+# Next.js standalone 모드의 공식 실행 명령어
+CMD ["node", "server.js"]

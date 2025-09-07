@@ -1,63 +1,105 @@
 'use client';
 
-import { useState } from 'react';
-import { UploadCloud, File as FileIcon, Download, Image as ImageIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { UploadCloud, File as FileIcon } from 'lucide-react';
+import { DownloadBtn } from '@/shared/ui/DownloadBtn';
+import { useConvertStore } from '@/features/pdf-convert/model/useConvertStore';
+import { useSession } from 'next-auth/react';
+import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
 
-export function PdfConverterWidget() {
-  const [file, setFile] = useState<File | null>(null);
-  const [isConverting, setIsConverting] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [targetFormat, setTargetFormat] = useState<'png' | 'jpeg'>('png');
+export default function PdfConverterWidget() {
+  const {
+    file,
+    isConverting,
+    error,
+    targetFormat,
+    setFile,
+    setTargetFormat,
+    convertAndDownload,
+    reset,
+  } = useConvertStore();
+
+  
+  const [previews, setPreviews] = useState<{ [fileName: string]: string }>({});
+
+  const fetchPreview = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('lastPage', '1'); // 첫 페이지만 추출
+
+    const res = await fetch('/api/pdf-preview', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if(!res.ok){
+      console.error('PDF 미리보기 생성 실패');
+      return;
+    }
+    const data = await res.json();
+
+    setPreviews(prev => ({...prev, [file.name]: data.previews[0]}));
+  }
+
+
+
+  const { data: session, update } = useSession();
+  const {
+    canDownload,
+    remaining,
+    syncWithUser,
+    increment: incrementDownloadCount,
+    isSyncedWithUser,
+    limit
+  } = useDownloadLimitStore();
+
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    syncWithUser(session?.user ?? null);
+  }, [session, syncWithUser]);
+
+  useEffect(() => {
+    if (!session) {
+      useDownloadLimitStore.getState().resetIfNeeded();
+    }
+  }, [session]);
+
+  useEffect(() => {
+    return () => {
+      reset();
+    };
+  }, [reset]);
 
   function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const { files } = event.target;
     if (files && files[0]) {
       setFile(files[0]);
-      setError(null);
+      fetchPreview(files[0]); 
     }
   }
 
-  async function handleConvert() {
-    if (!file) return;
-
-    setIsConverting(true);
-    setError(null);
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('targetFormat', targetFormat);
-
-    try {
-      const response = await fetch('/api/pdf-convert', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'PDF 변환에 실패했습니다.');
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `converted-${file.name.replace('.pdf', '')}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        setError('PDF를 변환하는 중 오류가 발생했습니다: ' + e.message);
-      } else {
-        setError('알 수 없는 오류가 발생했습니다.');
-      }
-      console.error(e);
-    } finally {
-      setIsConverting(false);
+  const handleConvertClick = async () => {
+    if (!file || !canDownload()) return;
+    const success = await convertAndDownload();
+    if (success) {
+      incrementDownloadCount();
+      await update();
     }
+  };
+
+  const getButtonText = () => {
+    if (isConverting) return '변환 중...';
+    
+    const baseText = `${targetFormat.toUpperCase()}로 변환 및 다운로드`;
+    if (!isClient) return baseText;
+
+    const remainingCount = remaining();
+    return `${baseText} (${isSyncedWithUser ? `${remainingCount}/${limit}` : remainingCount}회 남음)`;
   }
 
   return (
@@ -70,10 +112,15 @@ export function PdfConverterWidget() {
       </div>
 
       {!file && (
-        <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600">
+        <label
+          htmlFor="file-upload"
+          className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600"
+        >
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
             <UploadCloud className="w-10 h-10 mb-3 text-gray-400" />
-            <p className="mb-2 text-sm text-gray-500 dark:text-gray-400"><span className="font-semibold">클릭하여 업로드</span> 또는 드래그 앤 드롭</p>
+            <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+              <span className="font-semibold">클릭하여 업로드</span> 또는 드래그 앤 드롭
+            </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">PDF 파일</p>
           </div>
           <input id="file-upload" type="file" className="hidden" onChange={onFileChange} accept=".pdf" />
@@ -101,29 +148,48 @@ export function PdfConverterWidget() {
           </div>
 
           <div className="my-6">
-            <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">변환할 포맷 선택</label>
+            <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+              변환할 포맷 선택
+            </label>
             <div className="flex justify-center space-x-4">
-              <button onClick={() => setTargetFormat('png')}
-              className={`px-4 py-2 rounded-lg ${targetFormat === 'png' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white'}`}>
+              <button
+                onClick={() => setTargetFormat('png')}
+                className={`px-4 py-2 rounded-lg ${
+                  targetFormat === 'png' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white'
+                }`}
+              >
                 PNG로 변환
               </button>
-              <button onClick={() => setTargetFormat('jpeg')}
-              className={`px-4 py-2 rounded-lg ${targetFormat === 'jpeg' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white'}`}>
+              <button
+                onClick={() => setTargetFormat('jpeg')}
+                className={`px-4 py-2 rounded-lg ${
+                  targetFormat === 'jpeg' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white'
+                }`}
+              >
                 JPG로 변환
               </button>
             </div>
           </div>
-
-          <button
-            onClick={handleConvert}
-            disabled={isConverting}
-            className="w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400"
-          >
-            {isConverting ? '변환 중...' : `${targetFormat.toUpperCase()}로 변환 및 다운로드`}
-            <ImageIcon className="ml-3 -mr-1 h-5 w-5" />
-          </button>
         </div>
       )}
+
+      <div className="mt-8 text-center">
+        <DownloadBtn
+          text={getButtonText()}
+          isLoading={isConverting}
+          disabled={!file || isConverting || !canDownload()}
+          onClick={handleConvertClick}
+        />
+      </div>
+      {file && previews[file.name] && (
+  <div className="mt-4 text-center">
+    <img
+      src={previews[file.name]}
+      alt="Preview"
+      className="w-32 h-44 object-cover border rounded"
+    />
+  </div>
+)}
     </div>
   );
 }
