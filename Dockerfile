@@ -33,6 +33,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# 운영 환경에서 실행할 일반 사용자(nextjs)와 그룹(nodejs)을 생성합니다.
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 --ingroup nodejs nextjs
+
 # 런타임에 필요한 ghostscript만 설치
 RUN apt-get update && apt-get install -y ghostscript --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
@@ -42,6 +46,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/test_files ./test_files
+
+# 생성한 일반 사용자로 권한을 전환합니다.
+USER nextjs
 
 EXPOSE 3000
 
