@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { OperationType } from '@/generated/prisma';
+import { OperationType, User as PrismaUser } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { exec } from 'child_process';
 import { promises as fs } from 'fs';
@@ -7,14 +7,45 @@ import path from 'path';
 import { promisify } from 'util';
 import JSZip from 'jszip';
 import { Readable } from 'stream';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 const execPromise = promisify(exec);
+const MAX_DOWNLOADS_PER_DAY = 1;
 
 export async function POST(request: Request) {
   const startTime = performance.now();
+  const session = await getServerSession(authOptions);
+
+  // --- 사용자 사용량 체크 ---
+  if (session?.user?.email) {
+    const user: PrismaUser | null = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    });
+
+    if (user) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const lastDownload = user.lastDownloadDate;
+      let currentDownloads = user.downloadCount;
+
+      if (!lastDownload || lastDownload < today) {
+        currentDownloads = 0;
+      }
+
+      if (currentDownloads >= MAX_DOWNLOADS_PER_DAY) {
+        return NextResponse.json(
+          { error: `일일 최대 사용량(${MAX_DOWNLOADS_PER_DAY}회)을 초과했습니다.` },
+          { status: 429 }
+        );
+      }
+    }
+  }
+
   const formData = await request.formData();
   const file = formData.get('file') as File;
-  const targetFormat = formData.get('targetFormat') as string || 'png'; // 'png' or 'jpeg'
+  const targetFormat = formData.get('targetFormat') as string || 'png';
   const githubVersion = formData.get('githubVersion') as string | null;
 
   if (!file) {
@@ -26,24 +57,17 @@ export async function POST(request: Request) {
   let tempDir: string | null = null;
 
   try {
-    // 1. 임시 디렉토리 및 파일 경로 생성
     tempDir = await fs.mkdtemp(path.join('/tmp', 'pdf-convert-'));
     const inputFilePath = path.join(tempDir, 'input.pdf');
     const outputImagePattern = path.join(tempDir, `output-%d.${targetFormat}`);
 
-    // 2. 업로드된 파일을 임시 디렉토리에 저장
     await fs.writeFile(inputFilePath, inputBuffer);
 
-    // 3. Ghostscript 명령어 정의 및 실행 (PDF 페이지를 이미지로 변환)
-    // -sDEVICE: 출력 장치 (pngalpha, jpeg 등)
-    // -o: 출력 파일 패턴 (%d는 페이지 번호로 대체됨)
     const device = targetFormat === 'jpeg' ? 'jpeg' : 'pngalpha';
     const command = `gs -sDEVICE=${device} -o ${outputImagePattern} ${inputFilePath}`;
     await execPromise(command);
 
-    // 4. 생성된 이미지 파일들을 읽고 ZIP으로 압축
     const zip = new JSZip();
-    let outputSizeInBytes = 0;
     const filesInTempDir = await fs.readdir(tempDir);
 
     for (const fileName of filesInTempDir) {
@@ -51,7 +75,6 @@ export async function POST(request: Request) {
         const imagePath = path.join(tempDir, fileName);
         const imageBuffer = await fs.readFile(imagePath);
         zip.file(fileName, imageBuffer);
-        outputSizeInBytes += imageBuffer.length;
       }
     }
 
@@ -61,21 +84,38 @@ export async function POST(request: Request) {
     const endTime = performance.now();
     const processingTimeInMs = Math.round(endTime - startTime);
 
-    // 5. 성능 로그 기록
-    prisma.performanceLog.create({
-      data: {
-        operationType: OperationType.CONVERT_TO_IMAGE,
-        fileCount: 1, // 단일 PDF 파일 변환
-        totalInputSizeInBytes: BigInt(totalInputSizeInBytes),
-        outputSizeInBytes: finalOutputSizeInBytes,
-        processingTimeInMs,
-        githubVersion,
-      }
-    }).catch((err: unknown) => {
-      console.error("Failed to log performance data for conversion:", err);
+    // --- 성공 시 DB 업데이트 ---
+    const logAndUserUpdatePromises = [];
+
+    logAndUserUpdatePromises.push(
+      prisma.performanceLog.create({
+        data: {
+          operationType: OperationType.CONVERT_TO_IMAGE,
+          fileCount: 1,
+          totalInputSizeInBytes: BigInt(totalInputSizeInBytes),
+          outputSizeInBytes: finalOutputSizeInBytes,
+          processingTimeInMs,
+          githubVersion,
+        }
+      })
+    );
+
+    if (session?.user?.email) {
+      logAndUserUpdatePromises.push(
+        prisma.user.update({
+          where: { email: session.user.email },
+          data: {
+            downloadCount: { increment: 1 },
+            lastDownloadDate: new Date(),
+          },
+        })
+      );
+    }
+
+    Promise.all(logAndUserUpdatePromises).catch((err) => {
+      console.error("Failed to log or update user data:", err);
     });
 
-    // 6. 압축된 ZIP 파일과 함께 응답 반환
     const nodeReadable = Readable.from([new Uint8Array(zipBuffer)]);
     const webReadable = Readable.toWeb(nodeReadable) as any;
 
@@ -83,7 +123,6 @@ export async function POST(request: Request) {
       status: 200,
       headers: {
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(`converted-${file.name.replace('.pdf', '')}.zip`)}`,
-
         'Content-Type': 'application/zip',
       },
     });
@@ -97,7 +136,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
 
   } finally {
-    // 7. 임시 디렉토리 정리
     if (tempDir) {
       await fs.rm(tempDir, { recursive: true, force: true });
     }

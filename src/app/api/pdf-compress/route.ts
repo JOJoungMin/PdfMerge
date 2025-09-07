@@ -1,23 +1,50 @@
 import { NextResponse } from 'next/server';
-import { OperationType } from '@/generated/prisma';
+import { OperationType, User as PrismaUser } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { exec } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 import { Readable } from 'stream';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 const execPromise = promisify(exec);
-
-
+const MAX_DOWNLOADS_PER_DAY = 1;
 
 export async function POST(request: Request) {
   const startTime = performance.now();
+  const session = await getServerSession(authOptions);
+
+  // --- 사용자 사용량 체크 ---
+  if (session?.user?.email) {
+    const user: PrismaUser | null = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    });
+
+    if (user) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // 오늘 날짜의 시작
+
+      const lastDownload = user.lastDownloadDate;
+      let currentDownloads = user.downloadCount;
+
+      if (!lastDownload || lastDownload < today) {
+        currentDownloads = 0;
+      }
+
+      if (currentDownloads >= MAX_DOWNLOADS_PER_DAY) {
+        return NextResponse.json(
+          { error: `일일 최대 사용량(${MAX_DOWNLOADS_PER_DAY}회)을 초과했습니다.` },
+          { status: 429 }
+        );
+      }
+    }
+  }
+
   const formData = await request.formData();
   const file = formData.get('file') as File;
   const githubVersion = formData.get('githubVersion') as string | null;
-  // Ghostscript는 품질 설정을 직접 받기보다 사전 설정(e.g., /ebook)을 사용합니다.
-  // const quality = parseFloat(formData.get('quality') as string || '0.7');
 
   if (!file) {
     return NextResponse.json({ error: '압축할 파일이 필요합니다.' }, { status: 400 });
@@ -28,47 +55,60 @@ export async function POST(request: Request) {
   let tempDir: string | null = null;
 
   try {
-    // 1. 임시 디렉토리 및 파일 경로 생성
     tempDir = await fs.mkdtemp(path.join('/tmp', 'pdf-compress-'));
     const inputFilePath = path.join(tempDir, 'input.pdf');
     const outputFilePath = path.join(tempDir, 'output.pdf');
 
-    // 2. 업로드된 파일을 임시 디렉토리에 저장
     await fs.writeFile(inputFilePath, inputBuffer);
 
-    // 3. Ghostscript 명령어 정의 및 실행
     const command = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH -sOutputFile=${outputFilePath} ${inputFilePath}`;
     await execPromise(command);
 
-    // 4. 압축된 결과 파일을 읽기
     const outputBuffer = await fs.readFile(outputFilePath);
     const outputSizeInBytes = BigInt(outputBuffer.length);
 
     const endTime = performance.now();
     const processingTimeInMs = Math.round(endTime - startTime);
 
-    // 5. 성능 로그 기록
-    prisma.performanceLog.create({
-      data: {
-        operationType: OperationType.COMPRESS,
-        fileCount: 1,
-        totalInputSizeInBytes: BigInt(totalInputSizeInBytes),
-        outputSizeInBytes,
-        processingTimeInMs,
-        githubVersion, // Add this line
-      }
-    }).catch((err: unknown) => {
-      console.error("Failed to log performance data for compression:", err);
+    // --- 성공 시 DB 업데이트 ---
+    const logAndUserUpdatePromises = [];
+
+    logAndUserUpdatePromises.push(
+      prisma.performanceLog.create({
+        data: {
+          operationType: OperationType.COMPRESS,
+          fileCount: 1,
+          totalInputSizeInBytes: BigInt(totalInputSizeInBytes),
+          outputSizeInBytes,
+          processingTimeInMs,
+          githubVersion,
+        }
+      })
+    );
+
+    if (session?.user?.email) {
+      logAndUserUpdatePromises.push(
+        prisma.user.update({
+          where: { email: session.user.email },
+          data: {
+            downloadCount: { increment: 1 },
+            lastDownloadDate: new Date(),
+          },
+        })
+      );
+    }
+
+    Promise.all(logAndUserUpdatePromises).catch((err) => {
+      console.error("Failed to log or update user data:", err);
     });
 
-    // 6. 압축된 파일과 함께 응답 반환
     const nodeReadable = Readable.from([new Uint8Array(outputBuffer)]);
     const webReadable = Readable.toWeb(nodeReadable) as any;
 
     return new NextResponse(webReadable, {
       status: 200,
       headers: {
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(`edited-${file.name}`)}`,
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(`compressed-${file.name}`)}`,
         'Content-Type': 'application/pdf',
       },
     });
@@ -82,7 +122,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
 
   } finally {
-    // 7. 임시 디렉토리 정리
     if (tempDir) {
       await fs.rm(tempDir, { recursive: true, force: true });
     }

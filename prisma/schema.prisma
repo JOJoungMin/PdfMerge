@@ -50,6 +50,8 @@ model User {
   image         String?
   accounts      Account[]
   sessions      Session[]
+  downloadCount Int       @default(0)
+  lastDownloadDate DateTime @updatedAt
 }
 
 model VerificationToken {
