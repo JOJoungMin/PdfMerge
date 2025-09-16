@@ -44,7 +44,7 @@ jobs:
             echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login ghcr.io -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
 
             # 기존 컨테이너 중지 및 삭제
-            if [ "$(docker ps -q -f name=pdf-app-server)" ]; then
+            if [ "$(docker ps -a -q -f name=pdf-app-server)" ]; then
               docker stop pdf-app-server
               docker rm pdf-app-server
             fi
