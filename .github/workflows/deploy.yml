@@ -45,3 +45,6 @@ jobs:
             # 최신 이미지 pull 및 새 컨테이너 실행
             docker pull ghcr.io/${{ github.repository | lower }}:latest
             docker run -d --name pdf-app-server -p 3000:3000 ghcr.io/${{ github.repository | lower }}:latest
+
+
+            # A small change to force git to recognize this file
