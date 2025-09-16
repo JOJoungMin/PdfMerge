@@ -43,7 +43,7 @@ RUN apt-get update && apt-get install -y ghostscript --no-install-recommends && 
 
 # Builder 스테이지에서 생성된 빌드 결과물만 복사
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone/. ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/test_files ./test_files
 
