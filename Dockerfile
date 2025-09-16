@@ -1,56 +1,41 @@
-# ======================================================================================
-# STAGE 1: Builder
-# - 소스 코드를 빌드하고, 운영에 필요한 최소한의 결과물을 생성하는 단계
-# ======================================================================================
-FROM node:18-slim AS builder
-
-# 시스템 패키지 업데이트 및 ghostscript, poppler-utils 설치
-RUN apt-get update && apt-get install -y \
-    ghostscript \
-    poppler-utils \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
-
+# Stage 1: Builder - 애플리케이션 빌드 단계
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# 의존성 설치
+# package.json, package-lock.json, prisma 스키마 복사
 COPY package*.json ./
-RUN npm install
+COPY prisma ./prisma/
 
-# 소스 코드 복사 및 빌드
-COPY . .
+# 의존성 설치 (CI 환경에서는 npm ci가 더 안정적이고 빠릅니다)
+RUN npm ci
+
+# Prisma 클라이언트 생성
 RUN npx prisma generate
+
+# 나머지 소스 코드 복사
+COPY . .
+
+# Next.js 애플리케이션 빌드
 RUN npm run build
 
-# ======================================================================================
-# STAGE 2: Runner
-# - 빌드된 결과물만 가져와 실제 애플리케이션을 실행하는 단계
-# - 빌드에만 필요했던 소스코드나 개발용 패키지가 포함되지 않아 가볍고 안전함
-# ======================================================================================
-FROM node:18-slim AS runner
+# --- 
 
+# Stage 2: Runner - 애플리케이션 실행 단계
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# 운영 환경에서 실행할 일반 사용자(nextjs)와 그룹(nodejs)을 생성합니다.
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 --ingroup nodejs nextjs
+# 빌드 단계에서 프로덕션용 의존성만 복사
+COPY --from=builder /app/package*.json ./
+RUN npm ci --omit=dev
 
-# 런타임에 필요한 ghostscript만 설치
-RUN apt-get update && apt-get install -y ghostscript --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
-
-# Builder 스테이지에서 생성된 빌드 결과물만 복사
+# 빌드 단계에서 생성된 빌드 결과물 복사
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone/. ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder /app/test_files ./test_files
 
-# 생성한 일반 사용자로 권한을 전환합니다.
-USER nextjs
-
+# 애플리케이션이 실행될 포트 노출
 EXPOSE 3000
 
-# Next.js standalone 모드의 공식 실행 명령어
-CMD ["node", "server.js"]
+# 애플리케이션 실행 명령어
+CMD ["npm", "start"]
