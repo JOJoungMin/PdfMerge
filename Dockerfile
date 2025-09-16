@@ -7,7 +7,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # 의존성 설치 (CI 환경에서는 npm ci가 더 안정적이고 빠릅니다)
-RUN npm ci
+RUN npm install
 
 # Prisma 클라이언트 생성
 RUN npx prisma generate
@@ -28,7 +28,7 @@ ENV NODE_ENV=production
 
 # 빌드 단계에서 프로덕션용 의존성만 복사
 COPY --from=builder /app/package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # 빌드 단계에서 생성된 빌드 결과물 복사
 COPY --from=builder /app/.next ./.next
