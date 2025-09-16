@@ -46,4 +46,4 @@ COPY --from=builder /app/node_modules/.prisma ./.prisma
 EXPOSE 3000
 
 # 애플리케이션 실행 명령어
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
