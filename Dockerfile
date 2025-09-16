@@ -38,7 +38,7 @@ RUN npm install --omit=dev
 
 # 빌드 단계에서 생성된 빌드 결과물 복사
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
+# COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules/.prisma ./.prisma
 
 # 애플리케이션이 실행될 포트 노출
