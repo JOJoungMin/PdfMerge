@@ -26,7 +26,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository | lower }}:latest
+          tags: ghcr.io/${{ toLower(github.repository) }}:latest
       
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
@@ -43,8 +43,5 @@ jobs:
             fi
 
             # 최신 이미지 pull 및 새 컨테이너 실행
-            docker pull ghcr.io/${{ github.repository | lower }}:latest
-            docker run -d --name pdf-app-server -p 3000:3000 ghcr.io/${{ github.repository | lower }}:latest
-
-
-            # A small change to force git to recognize this file
+            docker pull ghcr.io/${{ toLower(github.repository) }}:latest
+            docker run -d --name pdf-app-server -p 3000:3000 ghcr.io/${{ toLower(github.repository) }}:latest
