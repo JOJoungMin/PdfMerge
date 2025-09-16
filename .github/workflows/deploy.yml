@@ -26,7 +26,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}:latest
+          tags: ghcr.io/${{ github.repository | lower }}:latest
       
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
@@ -43,8 +43,8 @@ jobs:
             fi
 
             # 최신 이미지 pull 및 새 컨테이너 실행
-            docker pull ghcr.io/${{ github.repository }}:latest
-            docker run -d --name pdf-app-server -p 3000:3000 ghcr.io/${{ github.repository }}:latest
+            docker pull ghcr.io/${{ github.repository | lower }}:latest
+            docker run -d --name pdf-app-server -p 3000:3000 ghcr.io/${{ github.repository | lower }}:latest
 
             # Nginx 재시작 (필요한 경우)
             # sudo systemctl restart nginx
