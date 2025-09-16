@@ -39,7 +39,7 @@ COPY --from=builder /app/package*.json ./
 # 빌드 단계에서 생성된 빌드 결과물 복사
 COPY --from=builder /app/.next ./.next
 # public 폴더가 없다면 이 줄은 삭제하거나 주석 처리하세요.
-COPY --from=builder /app/public ./public
+# COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules/.prisma ./.prisma
 
 # 애플리케이션이 실행될 포트 노출
