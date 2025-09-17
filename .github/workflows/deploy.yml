@@ -51,4 +51,4 @@ jobs:
 
             # 최신 이미지 pull 및 새 컨테이너 실행
             docker pull ghcr.io/${{ steps.string_ops.outputs.repo_lc }}:latest
-            docker run -d --name pdf-app-server -p 3000:3000 -e DATABASE_URL="${{ secrets.DATABASE_URL }}" -e NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}" ghcr.io/${{ steps.string_ops.outputs.repo_lc }}:latest
+            docker run -d --name pdf-app-server -p 3000:3000 -e DATABASE_URL="${{ secrets.DATABASE_URL }}" -e NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}" -e NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}" ghcr.io/${{ steps.string_ops.outputs.repo_lc }}:latest
