@@ -43,4 +43,4 @@ COPY --from=builder /app/prisma ./prisma
 EXPOSE 3000
 
 # 마이그레이션 실행 후 애플리케이션 시작
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start -H 0.0.0.0"]
+CMD ["sh", "-c", "npx prisma migrate deploy && ./node_modules/.bin/next start -H 0.0.0.0"]
