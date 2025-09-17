@@ -32,6 +32,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# PDF 처리에 필요한 외부 도구 (Ghostscript, Poppler) 설치
+RUN apk add --no-cache ghostscript poppler-utils
+
 # 빌더 스테이지에서 프로덕션용으로 정리된 파일만 복사
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
