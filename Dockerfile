@@ -5,9 +5,10 @@ WORKDIR /app
 # 네이티브 모듈 빌드에 필요한 시스템 의존성 설치 (e.g., canvas)
 RUN apk add --no-cache build-base python3 make g++ cairo-dev jpeg-dev pango-dev giflib-dev
 
-# package.json, package-lock.json, prisma 스키마 복사
+# package.json, package-lock.json, prisma 스키마 및 테스트 파일 복사
 COPY package*.json ./
 COPY prisma ./prisma/
+COPY test_files ./test_files
 
 # 전체 의존성 설치
 RUN npm install
@@ -41,6 +42,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 # COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/test_files ./test_files
 
 # 애플리케이션이 실행될 포트 노출
 EXPOSE 3000
