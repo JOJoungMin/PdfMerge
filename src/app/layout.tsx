@@ -5,6 +5,7 @@ import { Providers } from "./providers";
 import { AuthStatus } from "@/widgets/auth-status/ui/AuthStatus";
 import Link from "next/link";
 import { FileJson } from "lucide-react";
+import TransferSidebar from "@/widgets/transfer-sidebar/ui/TransferSidebar"; // Import TransferSidebar
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -45,6 +46,7 @@ export default function RootLayout({
               {children}
             </main>
           </div>
+          <TransferSidebar /> {/* Render TransferSidebar here */}
         </Providers>
       </body>
     </html>

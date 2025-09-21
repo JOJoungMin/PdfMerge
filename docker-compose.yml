@@ -2,27 +2,30 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
       
     ports:
       - "3000:3000"
     env_file:
-      - .env
+      - .env.local
     depends_on:
       - db
     # 로컬 개발 시 소스 코드 변경을 즉시 반영하기 위한 볼륨 설정
     # .:/app 은 현재 디렉토리를 컨테이너의 /app에 마운트합니다.
     # /app/node_modules 와 /app/.next 는 호스트의 폴더가 컨테이너의 폴더를 덮어쓰는 것을 방지합니다.
     volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+      - /usr/src/app/.next
+    command: sh -c "npx prisma generate && npm run dev"
 
   db:
     image: mysql:8.0
     restart: always
+    env_file:
+      - .env.local
     environment:
-      # .env 파일에 정의된 변수를 참조합니다.
+      # .env.local 파일에 정의된 변수를 참조합니다.
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:

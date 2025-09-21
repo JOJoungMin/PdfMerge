@@ -11,7 +11,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 const execPromise = promisify(exec);
-const MAX_DOWNLOADS_PER_DAY = 1;
+const MAX_DOWNLOADS_PER_DAY = 100;
 
 export async function POST(request: Request) {
   const startTime = performance.now();

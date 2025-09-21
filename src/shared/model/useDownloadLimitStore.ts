@@ -3,8 +3,8 @@ import { persist, createJSONStorage } from "zustand/middleware";
 
 import { User } from "next-auth";
 
-const ANONYMOUS_DAILY_LIMIT = 3;
-const USER_DAILY_LIMIT = 1; // API와 동일하게 설정
+const ANONYMOUS_DAILY_LIMIT = 300;
+const USER_DAILY_LIMIT = 100; // API와 동일하게 설정
 
 function getTodayLocal(): string {
     return new Intl.DateTimeFormat("en-CA", {timeZone: "Asia/Seoul"}).format(new Date());

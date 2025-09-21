@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { UploadCloud, File as FileIcon } from 'lucide-react';
 import { DownloadBtn } from '@/shared/ui/DownloadBtn';
 import { useCompressStore } from '@/features/pdf-compress/model/useCompressStore';
 import { useSession } from 'next-auth/react';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
+import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
+import { downloadBlob } from '@/shared/lib/pdf/downloadBlob';
+import { tempFileStore } from '@/shared/lib/temp-file-store';
 
 export default function PdfCompressorWidget() {
   const {
@@ -16,12 +19,13 @@ export default function PdfCompressorWidget() {
     compressionResult,
     setFile,
     setQuality,
-    compressAndDownload,
+    compressAndGetBlob,
     reset,
   } = useCompressStore();
 
 
   const [previews, setPreviews] = useState<{ [fileName: string]: string[] }>({});
+  const consumed = useRef(false);
 
   const fetchPreview = async (file: File) => {
     const formData = new FormData();
@@ -42,8 +46,7 @@ export default function PdfCompressorWidget() {
 
   }
 
-
-
+  const { showSidebar } = useTransferSidebarStore();
 
   const { data: session, update } = useSession();
   const {
@@ -71,11 +74,17 @@ export default function PdfCompressorWidget() {
     }
   }, [session]);
 
+  
+
   useEffect(() => {
-    return () => {
-      reset();
-    };
-  }, [reset]);
+    if (consumed.current) return;
+    const transferredFile = tempFileStore.getFile();
+    if (transferredFile) {
+      consumed.current = true;
+      setFile(transferredFile);
+      fetchPreview(transferredFile);
+    }
+  }, [setFile]);
 
   function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const { files } = event.target;
@@ -87,10 +96,20 @@ export default function PdfCompressorWidget() {
 
   const handleCompressClick = async () => {
     if (!file || !canDownload()) return;
-    const success = await compressAndDownload();
-    if (success) {
+    const blob = await compressAndGetBlob();
+    if (blob) {
+      const compressedFileName = `compressed-${file.name}`;
+      await downloadBlob(blob, compressedFileName);
+
+      const compressedFile = new File([blob], compressedFileName, { type: 'application/pdf' });
+
+      tempFileStore.setFile(compressedFile);
+      showSidebar();
+
       incrementDownloadCount();
       await update();
+
+      setFile(null);
     }
   };
 
