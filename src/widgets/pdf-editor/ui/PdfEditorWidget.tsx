@@ -1,68 +1,104 @@
-'use client';
+
+'use client'
 
 import { useRef, useEffect, useState } from 'react';
-import { UploadCloud, File as FileIcon } from 'lucide-react';
+import { UploadCloud } from 'lucide-react';
 import { DownloadBtn } from '@/shared/ui/DownloadBtn';
 import { useEditorStore } from '@/features/pdf-edit/model/useEditorStore';
+import type { PageRepresentation } from '@/features/pdf-edit/model/useEditorStore';
 import { useSession } from 'next-auth/react';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
+import { tempFileStore } from '@/shared/lib/temp-file-store';
+import { PdfEditorGrid } from './PdfEditorGrid';
 
 export default function PdfEditorWidget() {
   const {
-    file,
-    numPages,
+    files,
     pages,
-    isLoading,
     isProcessing,
     error,
-    setFile,
+    addFiles,
     removePage,
-    movePageUp,
-    movePageDown,
+    movePage,
     editAndDownload,
-    reset
   } = useEditorStore();
 
-  const [previews, setPreviews] = useState<{ [fileName: string]: string[] }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const consumed = useRef(false);
+  const [previews, setPreviews] = useState<{ [pageId: string]: string }>({});
   const [isClient, setIsClient] = useState(false);
 
   const { data: session, update } = useSession();
-  const {
-    canDownload,
-    remaining,
-    syncWithUser,
-    increment: incrementDownloadCount,
-    isSyncedWithUser,
-    limit
-  } = useDownloadLimitStore();
+  const { canDownload, remaining, syncWithUser, increment: incrementDownloadCount, isSyncedWithUser, limit } = useDownloadLimitStore();
 
-  // 클라이언트 감지
   useEffect(() => setIsClient(true), []);
 
-  // 세션 동기화
   useEffect(() => {
     syncWithUser(session?.user ?? null);
   }, [session, syncWithUser]);
 
+  // Transfer file from other pages
   useEffect(() => {
-    if (!session) useDownloadLimitStore.getState().resetIfNeeded();
-  }, [session]);
+    if (consumed.current || !addFiles) return;
+    const transferredFile = tempFileStore.getFile();
+    if (transferredFile) {
+      consumed.current = true;
+      addFiles([transferredFile]);
+    }
+  }, [addFiles]);
 
-  // 언마운트 시 상태 초기화
-  useEffect(() => () => reset(), [reset]);
+  // Fetch previews for new pages
+  useEffect(() => {
+    const fetchPreviewsForNewFiles = async () => {
+      // Find files that have been added but whose pages don't have previews yet
+      const filesToFetch = files.filter(file => 
+        pages.some(p => p.fileName === file.name && !previews[p.id])
+      );
 
-  // 파일 업로드 시 처리
+      if (filesToFetch.length === 0) return;
+
+      for (const file of filesToFetch) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          // Request all pages for this file
+          const res = await fetch('/api/pdf-preview', { method: 'POST', body: formData });
+          if (!res.ok) throw new Error(`Preview fetch failed for ${file.name}`);
+          
+          const data = await res.json(); // { previews: string[], totalPages: number }
+
+          if (data.previews) {
+            const pagesOfThisFile = pages.filter(p => p.fileName === file.name);
+            const newPreviews: { [pageId: string]: string } = {};
+            pagesOfThisFile.forEach((page, index) => {
+              if (data.previews[index]) {
+                newPreviews[page.id] = data.previews[index];
+              }
+            });
+            setPreviews(prev => ({ ...prev, ...newPreviews }));
+          }
+        } catch (e) {
+          console.error('Preview fetch failed for file', file.name, e);
+        }
+      }
+    };
+
+    fetchPreviewsForNewFiles();
+  }, [pages, files]); // Removed previews from dependency array to avoid re-running unnecessarily
+
   const onFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files[0]) setFile(files[0], 0);
-    else setFile(null, 0);
+    const newFiles = event.target.files;
+    if (newFiles) {
+      addFiles(Array.from(newFiles));
+    }
+    // Clear the input value to allow re-selecting the same file
+    if(fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
-  const handleFileChangeClick = () => setFile(null, 0);
-
   const handleEditClick = async () => {
-    if (!file || isLoading || isProcessing || pages.length === 0 || !canDownload()) return;
+    if (pages.length === 0 || !canDownload()) return;
     const success = await editAndDownload();
     if (success) {
       incrementDownloadCount();
@@ -70,51 +106,23 @@ export default function PdfEditorWidget() {
     }
   };
 
-  // 전체 페이지 미리보기 fetch
-  const fetchAllPreviews = async (file: File, numPages: number) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('firstPage', '1');
-    formData.append('lastPage', numPages.toString());
-
-    const res = await fetch('/api/pdf-preview', { method: 'POST', body: formData });
-    if (!res.ok) {
-      // TODO: Handle error appropriately
-      console.error("Failed to fetch previews");
-      return;
-    }
-
-    const data = await res.json();
-    if (data.previews) {
-      setPreviews(prev => ({ ...prev, [file.name]: data.previews }));
-    }
-  };
-
-  // 파일 업로드 후 전체 페이지 미리보기 로드
-  useEffect(() => {
-    if (file && numPages > 0) {
-      fetchAllPreviews(file, numPages);
-    }
-  }, [file, numPages]);
-
   const getButtonText = () => {
-    if (isLoading) return 'PDF를 불러오는 중입니다...';
-    if (isProcessing) return 'PDF 수정 중...';
-    if (!isClient) return 'PDF 수정 및 다운로드';
+    if (isProcessing) return 'PDF 생성 중...';
+    if (!isClient) return 'PDF 생성 및 다운로드';
     const remainingCount = remaining();
-    return `PDF 수정 및 다운로드 (${isSyncedWithUser ? `${remainingCount}/${limit}` : remainingCount}회 남음)`;
+    return `PDF 생성 및 다운로드 (${isSyncedWithUser ? `${remainingCount}/${limit}` : remainingCount}회 남음)`;
   };
 
   return (
-    <div className="w-full max-w-4xl rounded-lg bg-white p-8 shadow-md dark:bg-gray-800">
+    <div className="w-full max-w-6xl rounded-lg bg-white p-8 shadow-md dark:bg-gray-800">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">PDF 편집</h1>
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">PDF 편집기</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          PDF 파일을 선택하고 페이지를 재정렬하거나 삭제하세요.
+          여러 PDF를 올리고, 페이지를 재정렬하거나 삭제하여 새로운 PDF를 만드세요.
         </p>
       </div>
 
-      {!file && (
+      {pages.length === 0 && (
         <label
           htmlFor="file-upload"
           className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600"
@@ -124,61 +132,45 @@ export default function PdfEditorWidget() {
             <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
               <span className="font-semibold">클릭하여 업로드</span> 또는 드래그 앤 드롭
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">PDF 파일 (최대 50MB)</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">PDF 파일 (여러 개 선택 가능)</p>
           </div>
-          <input
+         
+        </label>
+      )}
+ <input
             id="file-upload"
             type="file"
             className="hidden"
             onChange={onFileChange}
             accept=".pdf"
             ref={fileInputRef}
+            multiple // Allow multiple files
           />
-        </label>
-      )}
-
       {error && (
         <div className="mt-4 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg text-center">
           <p>{error}</p>
         </div>
       )}
 
-      {file && (
+      {pages.length > 0 && (
         <>
-          <div className="flex justify-between items-center mb-4 p-3 rounded-md bg-gray-100 dark:bg-gray-700">
-            <div className="flex items-center min-w-0">
-              <FileIcon className="mr-2 h-5 w-5 flex-shrink-0 text-blue-500" />
-              <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">{file.name}</span>
-            </div>
-            <button
-              onClick={handleFileChangeClick}
-              className="text-sm text-blue-600 hover:underline flex-shrink-0 ml-2"
-            >
-              파일 변경
-            </button>
+          <div className="mt-6 text-center">
+            <DownloadBtn
+              text={getButtonText()}
+              isLoading={isProcessing}
+              disabled={isProcessing || pages.length === 0 || !canDownload()}
+              onClick={handleEditClick}
+            />
           </div>
-
-          {previews[file.name] && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4 max-h-[60vh] overflow-y-auto">
-              {previews[file.name].map((preview, index) => (
-                <div key={index} className="border rounded p-1">
-                  <img src={preview} alt={`Page ${index + 1}`} className="w-full object-cover" />
-                  <p className="text-center text-sm mt-1 text-gray-700 dark:text-gray-200">Page {index + 1}</p>
-                </div>
-              ))}
-            </div>
-          )}
+          <PdfEditorGrid
+            pages={pages}
+            previews={previews}
+            removePage={removePage}
+            movePage={movePage}
+            onAddFileClick={() => fileInputRef.current?.click()}
+          />
         </>
       )}
-
-      <div className="mt-6 text-center">
-        <DownloadBtn
-          text={getButtonText()}
-          isLoading={isProcessing || isLoading}
-          disabled={!file || isLoading || isProcessing || pages.length === 0 || !canDownload()}
-          onClick={handleEditClick}
-        />
-      </div>
     </div>
   );
 }

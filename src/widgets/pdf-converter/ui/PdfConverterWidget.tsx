@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { UploadCloud, File as FileIcon } from 'lucide-react';
 import { DownloadBtn } from '@/shared/ui/DownloadBtn';
 import { useConvertStore } from '@/features/pdf-convert/model/useConvertStore';
 import { useSession } from 'next-auth/react';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
+import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
+import { downloadBlob } from '@/shared/lib/pdf/downloadBlob';
+import { tempFileStore } from '@/shared/lib/temp-file-store';
 
 export default function PdfConverterWidget() {
   const {
@@ -15,12 +18,13 @@ export default function PdfConverterWidget() {
     targetFormat,
     setFile,
     setTargetFormat,
-    convertAndDownload,
+    convertAndGetBlob,
     reset,
   } = useConvertStore();
 
   
   const [previews, setPreviews] = useState<{ [fileName: string]: string }>({});
+  const consumed = useRef(false);
 
   const fetchPreview = async (file: File) => {
     const formData = new FormData();
@@ -41,7 +45,7 @@ export default function PdfConverterWidget() {
     setPreviews(prev => ({...prev, [file.name]: data.previews[0]}));
   }
 
-
+  const { showSidebar } = useTransferSidebarStore();
 
   const { data: session, update } = useSession();
   const {
@@ -59,6 +63,19 @@ export default function PdfConverterWidget() {
     setIsClient(true);
   }, []);
 
+  // 페이지 로드 시 임시 저장소에서 파일을 가져오는 로직
+  useEffect(() => {
+    if (consumed.current) return;
+    const transferredFile = tempFileStore.getFile();
+    if (transferredFile) {
+      consumed.current = true;
+      setFile(transferredFile);
+      if (transferredFile.type === 'application/pdf') {
+        fetchPreview(transferredFile);
+      }
+    }
+  }, []); // 페이지가 처음 로드될 때 한 번만 실행
+
   useEffect(() => {
     syncWithUser(session?.user ?? null);
   }, [session, syncWithUser]);
@@ -69,11 +86,7 @@ export default function PdfConverterWidget() {
     }
   }, [session]);
 
-  useEffect(() => {
-    return () => {
-      reset();
-    };
-  }, [reset]);
+  
 
   function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const { files } = event.target;
@@ -85,10 +98,19 @@ export default function PdfConverterWidget() {
 
   const handleConvertClick = async () => {
     if (!file || !canDownload()) return;
-    const success = await convertAndDownload();
-    if (success) {
+    const blob = await convertAndGetBlob();
+    if (blob) {
+      const convertedFileName = `converted-${file.name.replace('.pdf', '')}.zip`;
+      await downloadBlob(blob, convertedFileName);
+
+      // 원본 파일(file)을 사이드바로 전달
+      tempFileStore.setFile(file);
+      showSidebar();
+
       incrementDownloadCount();
       await update();
+
+      setFile(null);
     }
   };
 

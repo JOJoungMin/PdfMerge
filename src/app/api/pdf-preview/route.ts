@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     let lastPage = lastPageParam ? Number(lastPageParam) : 1;
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const tempDir = await fs.mkdtemp(path.join(process.cwd(), 'tmp-')); 
+    const tempDir = await fs.mkdtemp(path.join('/tmp', 'pdf-preview-')); 
     const inputPath = path.join(tempDir, 'input.pdf');
 
     try {

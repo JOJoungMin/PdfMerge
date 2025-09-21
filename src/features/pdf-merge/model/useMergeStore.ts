@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { downloadBlob } from "@/shared/lib/pdf/downloadBlob";
+import { tempFileStore } from "@/shared/lib/temp-file-store";
+import { useTransferSidebarStore } from "@/shared/model/useTransferSidebarStore";
 
 interface MergeState {
   files: File[];
@@ -53,6 +55,12 @@ export const useMergeStore = create<MergeState>((set, get) => ({
 
       const mergePdfBlob = await response.blob();
       await downloadBlob(mergePdfBlob, mergeFileName);
+
+      // 사이드바 열기 및 파일 전달 로직 추가
+      const newFile = new File([mergePdfBlob], mergeFileName, { type: 'application/pdf' });
+      tempFileStore.setFile(newFile);
+      useTransferSidebarStore.getState().showSidebar();
+
       set({ files: [], pageCounts: {} }); // Reset after successful merge
       return true;
     } catch (e: unknown) {

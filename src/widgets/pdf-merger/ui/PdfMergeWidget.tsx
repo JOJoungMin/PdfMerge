@@ -7,11 +7,13 @@ import { DownloadBtn } from '@/shared/ui/DownloadBtn';
 import { useMergeStore } from '@/features/pdf-merge/model/useMergeStore';
 import { useSession } from 'next-auth/react';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
+import { tempFileStore } from '@/shared/lib/temp-file-store';
 
 export default function PdfMergeWidget() {
   const { files, pageCounts, setPageCount, addFiles, removeFile, mergeAndDownload, reset, isMerging, error } = useMergeStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<{ [fileName: string]: string }>({});
+  const consumed = useRef(false);
 
   const { data: session, update } = useSession();
   const { canDownload, remaining, syncWithUser, increment: incrementDownloadCount, isSyncedWithUser, limit } = useDownloadLimitStore();
@@ -49,8 +51,14 @@ export default function PdfMergeWidget() {
   }, [session, syncWithUser]);
 
   useEffect(() => {
-    return () => reset();
-  }, [reset]);
+    if (consumed.current) return;
+    const transferredFile = tempFileStore.getFile();
+    if (transferredFile) {
+      consumed.current = true;
+      addFiles([transferredFile]);
+      fetchPreviewAndPageCount(transferredFile);
+    }
+  }, [addFiles]);
 
   const handleMergeClick = async () => {
     if (files.length < 2 || !canDownload()) return;
@@ -94,7 +102,10 @@ export default function PdfMergeWidget() {
         <Upload className="mb-2 h-10 w-10 text-gray-500" />
         <span className="font-semibold text-gray-600">파일 선택</span>
         <p className="text-sm text-gray-500">또는 파일을 여기로 드래그하세요</p>
-        <input
+       
+      </div>
+    )}
+     <input
           type="file"
           accept=".pdf"
           multiple
@@ -102,8 +113,6 @@ export default function PdfMergeWidget() {
           className="hidden"
           onChange={e => handleFileSelect(e.target.files)}
         />
-      </div>
-    )}
 
     {error && (
       <p className="mt-4 text-center text-red-500">오류: {error}</p>
