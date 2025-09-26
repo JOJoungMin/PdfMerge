@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-const TEST_FILES_DIR = '/app/test_files'; // Path inside Docker container
+const TEST_FILES_DIR = '/usr/src/app/test_files'; // Path inside Docker container
 
 export async function POST(request: Request) {
   try {
@@ -18,12 +18,9 @@ export async function POST(request: Request) {
 
     for (const fileName of testFileNames) {
       const filePath = path.join(TEST_FILES_DIR, fileName);
-      const fileBuffer = await fs.readFile(filePath);const arrayBuffer = fileBuffer.buffer.slice(
-        fileBuffer.byteOffset,
-        fileBuffer.byteOffset + fileBuffer.byteLength
-      );
-      
+      const fileBuffer = await fs.readFile(filePath);
       const testBlob = new Blob([new Uint8Array(fileBuffer)], { type: 'application/pdf' });
+
       // --- Test Compression ---
       try {
         const formData = new FormData();
@@ -61,13 +58,17 @@ export async function POST(request: Request) {
         results.push({ fileName, operation: 'convert', status: 'failed', error: error.message });
       }
 
-      // --- Test Edit (extract first page) ---
+      // --- Test Edit (extract first page from multiple files) ---
       try {
         const formData = new FormData();
-        formData.append('file', testBlob, fileName);
-        formData.append('pageInstructions', JSON.stringify([0])); // Extract first page
+        // Simulate combining the first page of the test file with itself
+        formData.append('files', testBlob, fileName);
+        const pageInstructions = JSON.stringify([
+          { fileName: fileName, pageIndex: 0 },
+        ]);
+        formData.append('pages', pageInstructions);
         formData.append('githubVersion', githubVersion);
-        const response = await fetch(`${process.env.NEXTAUTH_URL}/api/pdf-edit`, {
+        const response = await fetch(`${process.env.NEXTAUTH_URL}/api/pdf-edit-combined`, {
           method: 'POST',
           body: formData,
         });
@@ -75,9 +76,9 @@ export async function POST(request: Request) {
           const errorText = await response.text();
           throw new Error(`Edit failed: ${response.status} - ${errorText}`);
         }
-        results.push({ fileName, operation: 'edit', status: 'success' });
+        results.push({ fileName, operation: 'edit-combined', status: 'success' });
       } catch (error: any) {
-        results.push({ fileName, operation: 'edit', status: 'failed', error: error.message });
+        results.push({ fileName, operation: 'edit-combined', status: 'failed', error: error.message });
       }
 
       // --- Test Merge (merge with itself) ---

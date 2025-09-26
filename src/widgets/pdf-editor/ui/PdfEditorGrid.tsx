@@ -11,9 +11,10 @@ interface PdfEditorGridProps {
   removePage: (pageId: string) => void;
   movePage: (dragIndex: number, hoverIndex: number) => void;
   onAddFileClick: () => void;
+  onPreviewLoad: (pageId: string) => void;
 }
 
-export const PdfEditorGrid: React.FC<PdfEditorGridProps> = ({ pages, previews, removePage, movePage, onAddFileClick }) => {
+export const PdfEditorGrid: React.FC<PdfEditorGridProps> = ({ pages, previews, removePage, movePage, onAddFileClick, onPreviewLoad }) => {
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
 
@@ -66,7 +67,8 @@ export const PdfEditorGrid: React.FC<PdfEditorGridProps> = ({ pages, previews, r
             <img
               src={previews[page.id]}
               alt={`Page ${page.pageIndex + 1} of ${page.fileName}`}
-              className="w-full h-auto object-contain rounded-md bg-gray-100 dark:bg-gray-700 aspect-[2/3]"
+              className="w-full h-auto object-contain rounded-md bg-gray-100 dark:bg-gray-700 aspect-[2/3]" 
+              onLoad={() => onPreviewLoad(page.id)}
             />
           ) : (
             <div className="w-full h-auto bg-gray-200 dark:bg-gray-800 aspect-[2/3] flex items-center justify-center">

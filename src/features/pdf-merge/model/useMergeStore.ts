@@ -3,14 +3,19 @@ import { downloadBlob } from "@/shared/lib/pdf/downloadBlob";
 import { tempFileStore } from "@/shared/lib/temp-file-store";
 import { useTransferSidebarStore } from "@/shared/model/useTransferSidebarStore";
 
+export interface MergedFile {
+  id: string;
+  file: File;
+}
+
 interface MergeState {
-  files: File[];
-  pageCounts: { [fileName: string]: number };
+  files: MergedFile[];
+  pageCounts: { [id: string]: number };
   isMerging: boolean;
   error: string | null;
   addFiles: (files: File[]) => void;
-  removeFile: (fileName: string) => void;
-  setPageCount: (fileName: string, count: number) => void;
+  removeFile: (id: string) => void;
+  setPageCount: (id: string, count: number) => void;
   mergeAndDownload: (mergeFileName: string) => Promise<boolean>;
   reset: () => void;
 }
@@ -24,24 +29,31 @@ const initialState: Omit<MergeState, 'addFiles' | 'removeFile' | 'setPageCount' 
 
 export const useMergeStore = create<MergeState>((set, get) => ({
   ...initialState,
-  addFiles: (newFiles) => set((state) => ({ files: [...state.files, ...newFiles] })),
-  removeFile: (fileNameToRemove) => set((state) => {
-    const newFiles = state.files.filter((file) => file.name !== fileNameToRemove);
+  addFiles: (newFiles) => set((state) => {
+    const newMergedFiles: MergedFile[] = newFiles.map(file => ({
+      id: crypto.randomUUID(),
+      file: file,
+    }));
+    return { files: [...state.files, ...newMergedFiles] };
+  }),
+  removeFile: (idToRemove) => set((state) => {
+    const newFiles = state.files.filter((mf) => mf.id !== idToRemove);
     const newPageCounts = { ...state.pageCounts };
-    delete newPageCounts[fileNameToRemove];
+    delete newPageCounts[idToRemove];
     return { files: newFiles, pageCounts: newPageCounts };
   }),
-  setPageCount: (fileName, count) => set(state => ({
-    pageCounts: { ...state.pageCounts, [fileName]: count }
+  setPageCount: (id, count) => set(state => ({
+    pageCounts: { ...state.pageCounts, [id]: count }
   })),
   mergeAndDownload: async (mergeFileName) => {
     set({ isMerging: true, error: null });
     const { files } = get();
     try {
       const formData = new FormData();
-      files.forEach((file) => {
-        formData.append('files', file);
+      files.forEach((mf) => {
+        formData.append('files', mf.file);
       });
+      formData.append('githubVersion', process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || 'local');
 
       const response = await fetch('/api/pdf-merge', {
         method: 'POST',
@@ -56,7 +68,6 @@ export const useMergeStore = create<MergeState>((set, get) => ({
       const mergePdfBlob = await response.blob();
       await downloadBlob(mergePdfBlob, mergeFileName);
 
-      // 사이드바 열기 및 파일 전달 로직 추가
       const newFile = new File([mergePdfBlob], mergeFileName, { type: 'application/pdf' });
       tempFileStore.setFile(newFile);
       useTransferSidebarStore.getState().showSidebar();

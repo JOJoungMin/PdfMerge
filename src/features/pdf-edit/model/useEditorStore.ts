@@ -1,26 +1,30 @@
-
 import { create } from 'zustand';
 import { downloadBlob } from '@/shared/lib/pdf/downloadBlob';
 import { tempFileStore } from '@/shared/lib/temp-file-store';
 import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
 
+// 각 파일을 식별하기 위한 인터페이스
+export interface EditedFile {
+  id: string;
+  file: File;
+}
+
 // 각 페이지를 식별하고 원본 정보를 추적하기 위한 인터페이스
 export interface PageRepresentation {
-  id: string; // 고유 ID (예: fileId-pageIndex)
+  id: string; // 고유 페이지 ID (예: fileId-pageIndex)
   fileId: string; // 원본 파일의 고유 ID
-  fileName: string; // 원본 파일의 이름
+  fileName: string; // 원본 파일의 이름 (표시용)
   pageIndex: number; // 원본 파일 내에서의 0-based 인덱스
 }
 
 interface EditorState {
-  files: File[]; // 여러 PDF 파일을 저장
-  pages: PageRepresentation[]; // 모든 파일의 모든 페이지 목록
+  files: EditedFile[];
+  pages: PageRepresentation[];
   isProcessing: boolean;
   error: string | null;
-
   addFiles: (newFiles: File[]) => Promise<void>;
   removePage: (pageId: string) => void;
-  movePage: (dragIndex: number, hoverIndex: number) => void; // 드래그앤드롭으로 페이지 순서 변경
+  movePage: (dragIndex: number, hoverIndex: number) => void;
   editAndDownload: () => Promise<boolean>;
   reset: () => void;
 }
@@ -37,14 +41,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   addFiles: async (newFiles) => {
     const newPages: PageRepresentation[] = [];
-    const newFileEntries: File[] = [...get().files];
+    const currentFiles = get().files;
+    const newFileEntries: EditedFile[] = [];
 
     for (const file of newFiles) {
-      const fileId = `${file.name}-${Date.now()}`;
-      // 중복 파일 추가 방지
-      if (get().files.some(f => f.name === file.name)) continue;
+      // 이름 기반 중복 체크 대신, 실제 파일 내용을 기반으로 하거나 다른 전략이 필요할 수 있으나
+      // 현재 구조에서는 이름으로만 간단히 체크합니다. 더 정교한 방법은 추후 논의.
+      if (currentFiles.some(ef => ef.file.name === file.name)) continue;
 
-      newFileEntries.push(file);
+      const newFileEntry: EditedFile = { id: crypto.randomUUID(), file };
+      newFileEntries.push(newFileEntry);
 
       const formData = new FormData();
       formData.append('file', file);
@@ -55,8 +61,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
         for (let i = 0; i < totalPages; i++) {
           newPages.push({
-            id: `${fileId}-${i}`,
-            fileId: fileId,
+            id: `${newFileEntry.id}-${i}`,
+            fileId: newFileEntry.id,
             fileName: file.name,
             pageIndex: i,
           });
@@ -69,7 +75,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     set(state => ({
-      files: newFileEntries,
+      files: [...state.files, ...newFileEntries],
       pages: [...state.pages, ...newPages],
       error: null,
     }));
@@ -84,7 +90,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   movePage: (dragIndex, hoverIndex) => {
     set(state => {
       const newPages = [...state.pages];
-      // Swap logic
       [newPages[dragIndex], newPages[hoverIndex]] = [newPages[hoverIndex], newPages[dragIndex]];
       return { pages: newPages };
     });
@@ -98,12 +103,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     try {
       const formData = new FormData();
-      const requiredFileNames = new Set(pages.map(p => p.fileName));
-      const filesToUpload = files.filter(f => requiredFileNames.has(f.name));
-      filesToUpload.forEach(file => formData.append('files', file));
+      const requiredFileIds = new Set(pages.map(p => p.fileId));
+      const filesToUpload = files.filter(ef => requiredFileIds.has(ef.id));
+      
+      // FormData에 파일을 추가할 때, 각 파일에 고유한 키를 부여해야 할 수 있습니다.
+      // 여기서는 백엔드가 파일 이름으로 페이지를 매핑한다고 가정하고, 파일 이름도 함께 전송합니다.
+      const fileMap: { [id: string]: File } = {};
+      filesToUpload.forEach(ef => {
+        formData.append('files', ef.file);
+        fileMap[ef.id] = ef.file;
+      });
 
-      const pagePayload = pages.map(p => ({ fileName: p.fileName, pageIndex: p.pageIndex }));
+      const pagePayload = pages.map(p => ({ 
+        fileName: fileMap[p.fileId].name, // 백엔드에서 파일 이름이 필요하므로 매핑
+        pageIndex: p.pageIndex 
+      }));
+      
       formData.append('pages', JSON.stringify(pagePayload));
+      formData.append('githubVersion', process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || 'local');
 
       const response = await fetch('/api/pdf-edit-combined', {
         method: 'POST',
@@ -119,12 +136,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const newFileName = 'edited-document.pdf';
       await downloadBlob(blob, newFileName);
 
-      // 사이드바 열기 및 파일 전달 로직 추가
       const newFile = new File([blob], newFileName, { type: 'application/pdf' });
       tempFileStore.setFile(newFile);
       useTransferSidebarStore.getState().showSidebar();
 
-      set(initialState); // 성공 후 상태 초기화
+      set(initialState);
       return true;
 
     } catch (e: unknown) {

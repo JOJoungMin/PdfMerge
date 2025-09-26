@@ -1,3 +1,4 @@
+import { WebVitals } from "@/widgets/web-vitals/ui/WebVitals";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -5,7 +6,9 @@ import { Providers } from "./providers";
 import { AuthStatus } from "@/widgets/auth-status/ui/AuthStatus";
 import Link from "next/link";
 import { FileJson } from "lucide-react";
-import TransferSidebar from "@/widgets/transfer-sidebar/ui/TransferSidebar"; // Import TransferSidebar
+import TransferSidebar from "@/widgets/transfer-sidebar/ui/TransferSidebar";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -14,15 +17,18 @@ export const metadata: Metadata = {
   description: "PDF 병합, 분리, 압축, 변환을 위한 올인원 툴",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getServerSession(authOptions);
+
   return (
     <html lang="ko">
       <body className={`${inter.className} bg-gray-100 dark:bg-gray-900`}>
         <Providers>
+          <WebVitals />
           <div className="flex flex-col min-h-screen">
             <header className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-50">
               <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -34,9 +40,11 @@ export default function RootLayout({
                     </Link>
                   </div>
                   <div className="flex items-center gap-4">
-                    <Link href="/admin" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200">
-                      Admin
-                    </Link>
+                    {session?.user?.role === 'ADMIN' && (
+                      <Link href="/admin" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200">
+                        Admin
+                      </Link>
+                    )}
                     <AuthStatus />
                   </div>
                 </div>

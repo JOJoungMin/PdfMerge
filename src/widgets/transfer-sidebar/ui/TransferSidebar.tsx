@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
 import { useRouter } from 'next/navigation';
 import { X, FileUp, Shrink, ArrowRightLeft, Edit } from 'lucide-react';
@@ -7,6 +8,16 @@ import { X, FileUp, Shrink, ArrowRightLeft, Edit } from 'lucide-react';
 export default function TransferSidebar() {
   const { isVisible, hideSidebar } = useTransferSidebarStore();
   const router = useRouter();
+
+  useEffect(() => {
+    // 이 컴포넌트가 화면에서 사라질 때(unmount) 실행되는 cleanup 함수입니다.
+    return () => {
+      // 사이드바가 보이는 상태였다면, hideSidebar를 호출해 파일을 정리합니다.
+      if (isVisible) {
+        hideSidebar();
+      }
+    };
+  }, [isVisible, hideSidebar]);
 
   if (!isVisible) return null;
 

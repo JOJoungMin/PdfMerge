@@ -39,6 +39,7 @@ export const useConvertStore = create<ConvertState>((set, get) => ({
     const formData = new FormData();
     formData.append('file', file);
     formData.append('targetFormat', targetFormat);
+    formData.append('githubVersion', process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || 'local');
 
     try {
       const response = await fetch('/api/pdf-convert', {
@@ -74,6 +75,7 @@ export const useConvertStore = create<ConvertState>((set, get) => ({
     const formData = new FormData();
     formData.append('file', file);
     formData.append('targetFormat', targetFormat);
+    formData.append('githubVersion', process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || 'local');
 
     try {
       const response = await fetch('/api/pdf-convert', {

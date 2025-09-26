@@ -45,6 +45,7 @@ export const useCompressStore = create<CompressState>((set, get) => ({
     const formData = new FormData();
     formData.append('file', file);
     formData.append('quality', quality.toString());
+    formData.append('githubVersion', process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || 'local');
 
     try {
       const response = await fetch('/api/pdf-compress', {
@@ -86,6 +87,7 @@ export const useCompressStore = create<CompressState>((set, get) => ({
     const formData = new FormData();
     formData.append('file', file);
     formData.append('quality', quality.toString());
+    formData.append('githubVersion', process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || 'local');
 
     try {
       const response = await fetch('/api/pdf-compress', {

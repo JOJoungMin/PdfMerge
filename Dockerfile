@@ -2,8 +2,8 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# 네이티브 모듈 빌드에 필요한 시스템 의존성 설치 (e.g., canvas)
-RUN apk add --no-cache build-base python3 make g++ cairo-dev jpeg-dev pango-dev giflib-dev
+# 네이티브 모듈 빌드 및 git 버전 확인에 필요한 시스템 의존성 설치
+RUN apk add --no-cache git build-base python3 make g++ cairo-dev jpeg-dev pango-dev giflib-dev
 
 # package.json, package-lock.json, prisma 스키마 및 테스트 파일 복사
 COPY package*.json ./
@@ -18,6 +18,10 @@ RUN npx prisma generate
 
 # 나머지 소스 코드 복사
 COPY . .
+
+# Git 커밋 해시를 읽어 환경 변수로 설정 (빌드 시점에 적용)
+ARG GIT_COMMIT_SHA
+ENV NEXT_PUBLIC_GIT_COMMIT_SHA=$GIT_COMMIT_SHA
 
 # Next.js 애플리케이션 빌드
 RUN npm run build

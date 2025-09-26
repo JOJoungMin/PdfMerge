@@ -42,16 +42,22 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
   email         String?   @unique
   emailVerified DateTime?
   image         String?
+  role          Role      @default(USER)
   accounts      Account[]
   sessions      Session[]
   downloadCount Int       @default(0)
-  lastDownloadDate DateTime @updatedAt
+  lastDownloadDate DateTime @default(now())
 }
 
 model VerificationToken {
@@ -78,4 +84,29 @@ model PerformanceLog {
   processingTimeInMs      Int           // 처리 소요 시간 (밀리초)
   createdAt               DateTime      @default(now()) // 기록된 시간
   githubVersion           String?       // GitHub 버전 (선택 사항)
+  path                    String?      
+}
+
+model FrontendVital {
+  id                      String        @id @default(cuid())
+  createdAt               DateTime      @default(now())
+  path                    String
+  name                    String
+  value                   Float
+  githubVersion           String?       // GitHub 버전 (선택 사항)
+}
+
+// 사용자 경험(UX)과 관련된 성능 지표를 기록하는 모델
+model UserExperienceLog {
+  id                   String   @id @default(cuid())
+  createdAt            DateTime @default(now())
+  
+  metricName           String   // 어떤 경험을 측정했는지 (예: 'preview_generation')
+  durationInMs         Int      // 경험에 소요된 총 시간 (ms)
+  
+  path                 String   // 어느 페이지에서 발생했는지
+  fileCount            Int?     // 관련된 파일 수
+  totalFileSizeInBytes BigInt?  // 관련된 파일 총 크기
+  
+  githubVersion        String?
 }
