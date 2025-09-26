@@ -17,13 +17,28 @@ export const authOptions: NextAuthOptions = {
   // 여기에 세션 전략, 콜백 등 추가적인 옵션을 설정할 수 있습니다.
   callbacks: {
     async session({ session, user }) {
-      // session.user에 user.id와 다운로드 관련 정보를 추가합니다.
-      if (session.user) {
-        session.user.id = user.id;
-        session.user.downloadCount = user.downloadCount;
-        session.user.lastDownloadDate = user.lastDownloadDate;
+      try {
+        console.log('==> Session callback started. User from DB:', user);
+
+        if (session?.user && user?.id) {
+          session.user.id = user.id;
+
+          // Defensively assign properties
+          session.user.role = user.role ?? 'USER'; // Default to USER if undefined
+          session.user.downloadCount = user.downloadCount ?? 0; // Default to 0
+          session.user.lastDownloadDate = user.lastDownloadDate ?? new Date(); // Default to now
+
+          console.log('==> Successfully composed session:', session);
+        } else {
+          console.log('==> Session or user object is missing.');
+        }
+
+        return session;
+      } catch (error) {
+        console.error('!!!!!!!!!! CRITICAL ERROR IN SESSION CALLBACK !!!!!!!!!!!', error);
+        // Return the original session to prevent a total crash, but log the error.
+        return session;
       }
-      return session;
     },
   },
 }

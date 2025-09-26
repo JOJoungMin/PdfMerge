@@ -3,36 +3,37 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-      
+    entrypoint: /usr/src/app/entrypoint.sh
+    command: npm run dev
     ports:
       - "3000:3000"
     env_file:
       - .env.local
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     # 로컬 개발 시 소스 코드 변경을 즉시 반영하기 위한 볼륨 설정
-    # .:/app 은 현재 디렉토리를 컨테이너의 /app에 마운트합니다.
-    # /app/node_modules 와 /app/.next 는 호스트의 폴더가 컨테이너의 폴더를 덮어쓰는 것을 방지합니다.
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
       - /usr/src/app/.next
-    command: sh -c "npx prisma generate && npm run dev"
 
   db:
     image: mysql:8.0
     restart: always
     env_file:
-      - .env.local
+      - .env.db
     environment:
-      # .env.local 파일에 정의된 변수를 참조합니다.
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
     ports:
       - "3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
 
-# 데이터베이스 데이터를 영속적으로 저장하기 위한 명명된 볼륨
 volumes:
   mysql-data:

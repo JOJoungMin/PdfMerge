@@ -1,54 +1,51 @@
 import React from 'react';
-import { X } from 'lucide-react';
-import { Upload } from 'lucide-react';
+import { X, Upload } from 'lucide-react';
+import type { MergedFile } from '@/features/pdf-merge/model/useMergeStore';
 
 interface PdfMergeGridProps {
-  files: File[];
-  previews: { [fileName: string]: string };
-  pageCounts: { [fileName: string]: number };
-  handleRemoveFile: (fileName: string) => void;
+  files: MergedFile[];
+  previews: { [id: string]: string };
+  pageCounts: { [id: string]: number };
+  handleRemoveFile: (id: string) => void;
   onAddFileClick: () => void;
+  onPreviewLoad: (id: string) => void;
 }
 
-export const PdfMergeGrid: React.FC<PdfMergeGridProps> = ({ files, previews, pageCounts, handleRemoveFile, onAddFileClick }) => {
+export const PdfMergeGrid: React.FC<PdfMergeGridProps> = ({ files, previews, pageCounts, handleRemoveFile, onAddFileClick, onPreviewLoad }) => {
   return (
     <div className="mt-8">
       <div className="grid grid-cols-5 gap-3 justify-center">
-        {files.map((file, index) => (
-          <div key={file.name + index} className="flex items-start space-x-4">
-            {/* Image + Text Group */}
+        {files.map((mf) => (
+          <div key={mf.id} className="flex items-start space-x-4">
             <div className="flex flex-col items-center">
-              {/* 미리보기 썸네일 */}
               <div className="relative w-80 h-96 group">
-             
                 <img
-                  src={previews[file.name]}
-                  alt={`${file.name} preview`}
+                  src={previews[mf.id]}
+                  alt={`${mf.file.name} preview`}
                   className="w-full h-full object-contain border rounded-md shadow-sm bg-gray-100 dark:bg-gray-700"
+                  onLoad={() => onPreviewLoad(mf.id)}
                 />
                 <button
-                  onClick={() => handleRemoveFile(file.name)}
+                  onClick={() => handleRemoveFile(mf.id)}
                   className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X size={64} />
                 </button>
               </div>
-              {/* 파일 이름 + 페이지 수 */}
               <div className="mt-2 text-center">
                 <p
                   className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate w-80"
-                  title={file.name}
+                  title={mf.file.name}
                 >
-                  {file.name}
+                  {mf.file.name}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {pageCounts[file.name] ? `${pageCounts[file.name]}p` : '...'}
+                  {pageCounts[mf.id] ? `${pageCounts[mf.id]}p` : '...'}
                 </p>
               </div>
             </div>
           </div>
         ))}
-        {/* 새 파일 추가 버튼을 map 밖으로 옮김 */}
         <div className="flex items-start space-x-4">
           <button 
             onClick={onAddFileClick}

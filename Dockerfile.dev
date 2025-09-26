@@ -1,8 +1,8 @@
-# Use the Debian-based "slim" image for better compatibility
 FROM node:20-slim
+WORKDIR /usr/src/app
 
-# Install necessary system dependencies using apt-get
 RUN apt-get update && apt-get install -y \
+    git \
     build-essential \
     python3 \
     make \
@@ -16,23 +16,11 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Set the working directory
-WORKDIR /usr/src/app
-
-# Copy package.json and package-lock.json to leverage Docker cache
 COPY package*.json ./
-
-# Install all dependencies, including devDependencies
 RUN npm install
 
-# Copy the rest of the application's source code
 COPY . .
 
-# Generate Prisma client (needed for development as well)
-
-
-# Expose the port Next.js runs on in development
 EXPOSE 3000
 
-# The command to start the development server
-CMD ["npm", "run", "dev"]
+# CMD 명령어는 docker-compose.yml에서 덮어쓰므로 여기서는 제거

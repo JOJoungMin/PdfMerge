@@ -33,6 +33,8 @@ jobs:
           tags: |
             ghcr.io/${{ steps.string_ops.outputs.repo_lc }}:latest
             ghcr.io/${{ steps.string_ops.outputs.repo_lc }}:${{ github.sha }}
+          build-args: |
+            GIT_COMMIT_SHA=${{ github.sha }}
       
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
