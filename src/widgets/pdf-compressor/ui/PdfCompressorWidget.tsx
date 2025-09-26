@@ -94,7 +94,7 @@ export default function PdfCompressorWidget() {
     const data = await res.json();
 
     if (data.previews && data.previews.length > 0) {
-      const pageIndices = new Set(data.previews.map((_: any, idx: number) => idx));
+      const pageIndices = new Set<number>(data.previews.map((_: any, idx: number) => idx)); 
       if (batchTrackingRef.current) {
         batchTrackingRef.current.pendingFiles = pageIndices;
       }
