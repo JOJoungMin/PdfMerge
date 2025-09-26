@@ -35,6 +35,7 @@ export default function PdfConverterWidget() {
     setFile,
     setTargetFormat,
     convertAndGetBlob,
+    reset,
   } = useConvertStore();
 
   const [previews, setPreviews] = useState<{ [fileName: string]: string }>({});
@@ -115,6 +116,13 @@ export default function PdfConverterWidget() {
 
   useEffect(() => { syncWithUser(session?.user ?? null); }, [session, syncWithUser]);
   useEffect(() => { if (!session) { useDownloadLimitStore.getState().resetIfNeeded(); } }, [session]);
+
+  useEffect(() => {
+    // 컴포넌트가 언마운트될 때 스토어를 리셋합니다.
+    return () => {
+      reset();
+    }
+  }, [reset]);
 
   const handleConvertClick = async () => {
     if (!file || !canDownload()) return;

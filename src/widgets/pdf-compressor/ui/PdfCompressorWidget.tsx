@@ -36,6 +36,7 @@ export default function PdfCompressorWidget() {
     setFile,
     setQuality,
     compressAndGetBlob,
+    reset,
   } = useCompressStore();
 
   const [previews, setPreviews] = useState<{ [fileName: string]: string[] }>({});
@@ -112,6 +113,13 @@ export default function PdfCompressorWidget() {
   useEffect(() => { setIsClient(true); }, []);
   useEffect(() => { syncWithUser(session?.user ?? null); }, [session, syncWithUser]);
   useEffect(() => { if (!session) { useDownloadLimitStore.getState().resetIfNeeded(); } }, [session]);
+
+  useEffect(() => {
+    // 컴포넌트가 언마운트될 때 스토어를 리셋합니다.
+    return () => {
+      reset();
+    }
+  }, [reset]);
 
   const onFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const { files } = event.target;

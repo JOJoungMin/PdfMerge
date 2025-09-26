@@ -36,6 +36,7 @@ export default function PdfEditorWidget() {
     removePage,
     movePage,
     editAndDownload,
+    reset,
   } = useEditorStore();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +58,13 @@ export default function PdfEditorWidget() {
 
   useEffect(() => { setIsClient(true); }, []);
   useEffect(() => { syncWithUser(session?.user ?? null); }, [session, syncWithUser]);
+
+  useEffect(() => {
+    // 컴포넌트가 언마운트될 때 스토어를 리셋합니다.
+    return () => {
+      reset();
+    }
+  }, [reset]);
 
   const handlePreviewLoad = useCallback((pageId: string) => {
     const batch = batchTrackingRef.current;

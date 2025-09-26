@@ -27,7 +27,7 @@ const sendUserExperienceLog = (data: object) => {
 };
 
 export default function PdfMergeWidget() {
-  const { files, pageCounts, setPageCount, addFiles, removeFile, mergeAndDownload, isMerging, error } = useMergeStore();
+  const { files, pageCounts, setPageCount, addFiles, removeFile, mergeAndDownload, reset, isMerging, error } = useMergeStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<{ [id: string]: string }>({});
   const consumed = useRef(false);
@@ -126,6 +126,13 @@ export default function PdfMergeWidget() {
   useEffect(() => {
     syncWithUser(session?.user ?? null);
   }, [session, syncWithUser]);
+
+  useEffect(() => {
+    // 컴포넌트가 언마운트될 때 스토어를 리셋합니다.
+    return () => {
+      reset();
+    }
+  }, [reset]);
 
   useEffect(() => {
     if (consumed.current) return;
