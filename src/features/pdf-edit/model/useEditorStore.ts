@@ -49,7 +49,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // 현재 구조에서는 이름으로만 간단히 체크합니다. 더 정교한 방법은 추후 논의.
       if (currentFiles.some(ef => ef.file.name === file.name)) continue;
 
-      const newFileEntry: EditedFile = { id: crypto.randomUUID(), file };
+      const newFileEntry: EditedFile = { id: `${file.name}-${Date.now()}-${Math.random()}`, file };
       newFileEntries.push(newFileEntry);
 
       const formData = new FormData();

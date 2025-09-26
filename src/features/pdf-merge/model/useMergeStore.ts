@@ -31,7 +31,7 @@ export const useMergeStore = create<MergeState>((set, get) => ({
   ...initialState,
   addFiles: (newFiles) => set((state) => {
     const newMergedFiles: MergedFile[] = newFiles.map(file => ({
-      id: crypto.randomUUID(),
+      id: `${file.name}-${Date.now()}-${Math.random()}`,
       file: file,
     }));
     return { files: [...state.files, ...newMergedFiles] };
