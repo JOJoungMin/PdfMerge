@@ -1,44 +1,32 @@
-# dependencies
-/node_modules
-/.pnp
+# Dependencies
+node_modules/
+.pnp
 .pnp.js
-.yarn/install-state.gz
 
-# testing
-/coverage
+# Build
+.next/
+out/
+dist/
+build/
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files (매우 중요)
-# 민감한 정보를 담고 있는 로컬 환경 파일만 무시합니다.
+# Env
+.env
 .env*.local
 
-# vercel
-.vercel
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# OS
+.DS_Store
+Thumbs.db
 
-# 기타 무시할 파일/폴더
-readme.txt
-/src/generated/prisma
-data/db/mysql.sock
+# Logs
+*.log
+npm-debug.log*
 
-# 다음 파일/폴더는 .gitignore에서 제거해야 합니다.
-# .env (GitHub Actions에 필요함)
-# .git/ (Git 저장소 자체)
+# Legacy (추적 제외)
+pdfmerge/
+mysql-data/
