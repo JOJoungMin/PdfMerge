@@ -10,7 +10,7 @@ const tools = [
 
 export function MainMenuWidget() {
   return (
-    <div className="w-full max-w-4xl rounded-lg bg-white p-8 shadow-md dark:bg-gray-800">
+    <div className="w-full max-w-4xl mx-auto rounded-lg bg-white p-8 shadow-md dark:bg-gray-800">
       <div className="text-center mb-10">
         <h1 className="text-4xl font-bold text-gray-800 dark:text-white">PDF 유틸리티</h1>
         <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">필요한 도구를 선택하세요.</p>
