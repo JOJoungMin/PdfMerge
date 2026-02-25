@@ -7,6 +7,8 @@ on:
 
 env:
   NODE_VERSION: '20'
+  AWS_REGION: 'ap-northeast-2'
+  ECR_REPOSITORY: 'pdf-utils-backend'
 
 jobs:
   deploy-and-test:
@@ -22,7 +24,26 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'web/package-lock.json'
 
-      # EC2에 배포
+      # 백엔드 Docker 이미지 빌드 → ECR push
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest ./backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      # EC2: 백엔드는 Docker로 갱신, 프론트는 빌드 후 PM2
       - name: Deploy to EC2
         env:
           EC2_HOST: ${{ vars.EC2_HOST }}
@@ -30,27 +51,29 @@ jobs:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_PROJECT_PATH: ${{ vars.EC2_PROJECT_PATH }}
           EC2_BACKEND_URL: ${{ vars.EC2_BACKEND_URL }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPO: ${{ env.ECR_REPOSITORY }}
+          AWS_REG: ${{ env.AWS_REGION }}
         run: |
           mkdir -p ~/.ssh
           echo "$EC2_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${EC2_USER}@${EC2_HOST} << DEPLOY_SCRIPT
-          set -e
-          cd ${EC2_PROJECT_PATH}
-          git fetch origin && git reset --hard origin/main
-
-          cd backend
-          npm ci
-          npm run build
-          pm2 restart backend || pm2 start dist/main.js --name backend
-
-          cd ../web
-          npm ci
-          NEXT_PUBLIC_API_URL=${EC2_BACKEND_URL} npm run build
-          pm2 restart frontend || pm2 start npm --name frontend -- start
-
-          pm2 save
-          DEPLOY_SCRIPT
+          IMAGE="${ECR_REGISTRY}/${ECR_REPO}:latest"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${EC2_USER}@${EC2_HOST} " \
+            set -e && \
+            cd ${EC2_PROJECT_PATH} && \
+            git fetch origin && git reset --hard origin/main && \
+            aws ecr get-login-password --region ${AWS_REG} | docker login --username AWS --password-stdin ${ECR_REGISTRY} && \
+            docker pull ${IMAGE} && \
+            docker stop pdf-api 2>/dev/null || true && \
+            docker rm pdf-api 2>/dev/null || true && \
+            docker run -d --name pdf-api -p 3001:3001 --restart unless-stopped ${IMAGE} && \
+            cd web && \
+            npm ci && \
+            NEXT_PUBLIC_API_URL=${EC2_BACKEND_URL} npm run build && \
+            (pm2 restart frontend || pm2 start npm --name frontend -- start) && \
+            pm2 save \
+          "
 
       # EC2 스테이징이 뜰 때까지 대기
       - name: Wait for staging
