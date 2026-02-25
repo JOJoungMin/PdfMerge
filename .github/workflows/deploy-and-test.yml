@@ -1,0 +1,87 @@
+name: Deploy to EC2 and Test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  deploy-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      # EC2에 배포
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ vars.EC2_HOST }}
+          EC2_USER: ${{ vars.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_PROJECT_PATH: ${{ vars.EC2_PROJECT_PATH }}
+          EC2_BACKEND_URL: ${{ vars.EC2_BACKEND_URL }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$EC2_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${EC2_USER}@${EC2_HOST} << DEPLOY_SCRIPT
+          set -e
+          cd ${EC2_PROJECT_PATH}
+          git fetch origin && git reset --hard origin/main
+
+          cd backend
+          npm ci
+          npm run build
+          pm2 restart backend || pm2 start dist/main.js --name backend
+
+          cd ../web
+          npm ci
+          NEXT_PUBLIC_API_URL=${EC2_BACKEND_URL} npm run build
+          pm2 restart frontend || pm2 start npm --name frontend -- start
+
+          pm2 save
+          DEPLOY_SCRIPT
+
+      # EC2 스테이징이 뜰 때까지 대기
+      - name: Wait for staging
+        run: |
+          STAGING_URL="${{ vars.E2E_BASE_URL }}"
+          for i in {1..30}; do
+            if curl -sf "$STAGING_URL" > /dev/null; then
+              echo "Staging is ready"
+              exit 0
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 10
+          done
+          echo "Staging did not become ready"
+          exit 1
+
+      # Playwright E2E (EC2 스테이징 대상)
+      - name: Install Playwright
+        working-directory: web
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: web
+        run: npx playwright install chromium --with-deps
+      - name: Run E2E tests
+        working-directory: web
+        env:
+          CI: true
+          E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+        run: npm run test
+
+      # 테스트 통과 시 Vercel 배포
+      - name: Trigger Vercel deploy
+        if: success()
+        run: |
+          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"

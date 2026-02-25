@@ -7,7 +7,6 @@ import { useCompressStore } from '@/features/pdf-compress/model/useCompressStore
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
 import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
 import { downloadBlob } from '@/shared/lib/pdf/downloadBlob';
-import { tempFileStore } from '@/shared/lib/temp-file-store';
 import { API_BASE_URL } from '@/shared/api/config';
 
 const PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(
@@ -17,7 +16,6 @@ const PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(
 export default function PdfCompressorWidget() {
   const { file, isCompressing, error, quality, compressionResult, setFile, setQuality, compressAndGetBlob, reset } = useCompressStore();
   const [previews, setPreviews] = useState<{ [fileName: string]: string[] }>({});
-  const consumed = useRef(false);
   const { showSidebar } = useTransferSidebarStore();
   const { canDownload, remaining, increment } = useDownloadLimitStore();
 
@@ -34,8 +32,6 @@ export default function PdfCompressorWidget() {
     } catch {}
   }, []);
 
-  useEffect(() => () => reset(), [reset]);
-
   const onFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const f = e.target.files?.[0];
@@ -48,22 +44,26 @@ export default function PdfCompressorWidget() {
   );
 
   useEffect(() => {
-    if (consumed.current) return;
-    const transferred = tempFileStore.getFile();
+    const transferred = useTransferSidebarStore.getState().getAndClearTransferFile();
     if (transferred) {
-      consumed.current = true;
       setFile(transferred);
       fetchPreview(transferred);
+    } else {
+      const existingFile = useCompressStore.getState().file;
+      if (existingFile) {
+        fetchPreview(existingFile);
+      } else {
+        reset();
+      }
     }
-  }, [setFile, fetchPreview]);
+  }, []);
 
   const handleCompressClick = async () => {
     if (!file || !canDownload()) return;
     const blob = await compressAndGetBlob();
     if (blob) {
       await downloadBlob(blob, `compressed-${file.name}`);
-      tempFileStore.setFile(new File([blob], `compressed-${file.name}`, { type: 'application/pdf' }));
-      showSidebar();
+      showSidebar(new File([blob], `compressed-${file.name}`, { type: 'application/pdf' }));
       increment();
       setFile(null);
     }

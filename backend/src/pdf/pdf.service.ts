@@ -20,7 +20,8 @@ function getGsCommand(): string {
 const gsCommand = getGsCommand();
 
 export interface PageRepresentation {
-  fileName: string;
+  fileIndex?: number;
+  fileName?: string;
   pageIndex: number;
 }
 
@@ -49,14 +50,15 @@ export class PdfService {
       throw new Error('필수 데이터가 누락되었습니다.');
     }
     const orderedPages: PageRepresentation[] = JSON.parse(pagesJSON);
-    const sourceDocs = new Map<string, PDFDocument>();
+    const sourceDocs: PDFDocument[] = [];
     for (const f of files) {
       const pdfDoc = await PDFDocument.load(f.buffer);
-      sourceDocs.set(f.originalname, pdfDoc);
+      sourceDocs.push(pdfDoc);
     }
     const newPdfDoc = await PDFDocument.create();
     for (const pageInfo of orderedPages) {
-      const sourceDoc = sourceDocs.get(pageInfo.fileName);
+      const idx = pageInfo.fileIndex ?? (pageInfo.fileName != null ? files.findIndex((f) => f.originalname === pageInfo.fileName) : -1);
+      const sourceDoc = idx >= 0 ? sourceDocs[idx] : undefined;
       if (!sourceDoc) continue;
       const [copiedPage] = await newPdfDoc.copyPages(sourceDoc, [pageInfo.pageIndex]);
       newPdfDoc.addPage(copiedPage);
@@ -65,25 +67,24 @@ export class PdfService {
     return Buffer.from(bytes);
   }
 
-  /** 미리보기: 페이지 수 + 썸네일 base64 (Ghostscript, pdfinfo 필요) */
+  /** 미리보기: 페이지 수는 pdf-lib 사용, 썸네일은 Ghostscript 필요 */
   async preview(
     file: Express.Multer.File,
     firstPage: number,
     lastPage?: number,
   ): Promise<{ previews: string[]; totalPages: number }> {
     if (!file) throw new Error('파일이 필요합니다.');
+    let totalPages = 1;
+    try {
+      const pdfDoc = await PDFDocument.load(file.buffer);
+      totalPages = pdfDoc.getPageCount();
+    } catch {
+      // pdf-lib 실패 시 기본값
+    }
     const tempDir = await fs.mkdtemp(path.join(this.tmpDir, 'pdf-preview-'));
     const inputPath = path.join(tempDir, 'input.pdf');
     try {
       await fs.writeFile(inputPath, file.buffer);
-      let totalPages = 1;
-      try {
-        const { stdout } = await execPromise(`pdfinfo "${inputPath}"`);
-        const match = stdout.match(/Pages:\s+(\d+)/);
-        if (match) totalPages = Number(match[1]);
-      } catch {
-        // pdfinfo 없으면 기본값
-      }
       const last = lastPage !== undefined && lastPage !== null ? lastPage : totalPages;
       const previews: string[] = [];
       for (let i = firstPage; i <= last; i++) {

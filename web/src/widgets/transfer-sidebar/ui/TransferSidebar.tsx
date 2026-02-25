@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { X, FileUp, Shrink, ArrowRightLeft, Edit } from 'lucide-react';
 
 export default function TransferSidebar() {
-  const { isVisible, hideSidebar } = useTransferSidebarStore();
+  const { isVisible, closeInstantly, hideSidebar } = useTransferSidebarStore();
   const router = useRouter();
 
   useEffect(() => {
@@ -15,12 +15,20 @@ export default function TransferSidebar() {
     };
   }, [isVisible, hideSidebar]);
 
-  if (!isVisible) return null;
-
-  const handleTransfer = (path: string) => router.push(path);
+  const handleTransfer = (path: string) => {
+    hideSidebar();
+    router.push(path);
+  };
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-80 bg-white shadow-lg p-4 flex flex-col dark:bg-gray-800">
+    <div
+      className="fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-lg p-4 flex flex-col dark:bg-gray-800"
+      style={{
+        transform: isVisible ? 'translateX(0)' : 'translateX(-100%)',
+        transition: closeInstantly ? 'none' : 'transform 0.3s ease-in-out',
+        pointerEvents: isVisible ? 'auto' : 'none',
+      }}
+    >
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white">다른 기능 사용하기</h2>
         <button onClick={hideSidebar} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">

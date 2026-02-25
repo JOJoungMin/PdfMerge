@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { downloadBlob } from '@/shared/lib/pdf/downloadBlob';
-import { tempFileStore } from '@/shared/lib/temp-file-store';
 import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
 import { API_BASE_URL } from '@/shared/api/config';
 
@@ -96,13 +95,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const formData = new FormData();
       const requiredFileIds = new Set(pages.map((p) => p.fileId));
       const filesToUpload = files.filter((ef) => requiredFileIds.has(ef.id));
-      const fileMap: { [id: string]: File } = {};
-      filesToUpload.forEach((ef) => {
+      const fileIdToIndex: { [id: string]: number } = {};
+      filesToUpload.forEach((ef, idx) => {
         formData.append('files', ef.file);
-        fileMap[ef.id] = ef.file;
+        fileIdToIndex[ef.id] = idx;
       });
 
-      const pagePayload = pages.map((p) => ({ fileName: fileMap[p.fileId].name, pageIndex: p.pageIndex }));
+      const pagePayload = pages.map((p) => ({ fileIndex: fileIdToIndex[p.fileId], pageIndex: p.pageIndex }));
       formData.append('pages', JSON.stringify(pagePayload));
       formData.append('githubVersion', process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || 'local');
 
@@ -116,8 +115,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       await downloadBlob(blob, 'edited-document.pdf');
 
       const newFile = new File([blob], 'edited-document.pdf', { type: 'application/pdf' });
-      tempFileStore.setFile(newFile);
-      useTransferSidebarStore.getState().showSidebar();
+      useTransferSidebarStore.getState().showSidebar(newFile);
 
       set(initialState);
       return true;

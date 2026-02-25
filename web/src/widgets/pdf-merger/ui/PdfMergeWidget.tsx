@@ -7,7 +7,7 @@ import { DownloadBtn } from '@/shared/ui/DownloadBtn';
 import { useMergeStore } from '@/features/pdf-merge/model/useMergeStore';
 import type { MergedFile } from '@/features/pdf-merge/model/useMergeStore';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
-import { tempFileStore } from '@/shared/lib/temp-file-store';
+import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
 import { API_BASE_URL } from '@/shared/api/config';
 
 const PLACEHOLDER_PREVIEW = 'data:image/svg+xml,' + encodeURIComponent(
@@ -18,7 +18,6 @@ export default function PdfMergeWidget() {
   const { files, pageCounts, setPageCount, addFiles, removeFile, mergeAndDownload, reset, isMerging, error } = useMergeStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<{ [id: string]: string }>({});
-  const consumed = useRef(false);
   const prevFilesRef = useRef<MergedFile[]>([]);
 
   const { canDownload, remaining, increment: incrementDownloadCount } = useDownloadLimitStore();
@@ -75,18 +74,16 @@ export default function PdfMergeWidget() {
     useDownloadLimitStore.getState().resetIfNeeded();
   }, []);
 
-  useEffect(() => () => reset(), [reset]);
-
   useEffect(() => {
-    if (consumed.current) return;
-    const transferredFile = tempFileStore.getFile();
+    const transferredFile = useTransferSidebarStore.getState().getAndClearTransferFile();
     if (transferredFile) {
-      consumed.current = true;
       const dt = new DataTransfer();
       dt.items.add(transferredFile);
       handleFileSelect(dt.files);
+    } else if (useMergeStore.getState().files.length === 0) {
+      reset();
     }
-  }, [handleFileSelect]);
+  }, []);
 
   const handleMergeClick = async () => {
     if (files.length < 2 || !canDownload()) return;

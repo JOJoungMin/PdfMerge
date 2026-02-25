@@ -30,3 +30,16 @@ npm-debug.log*
 # Legacy (추적 제외)
 pdfmerge/
 mysql-data/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# 키/인증서 (절대 커밋 금지)
+*.pem
+*.key
+
+# 로컬 캐시
+.cache/

@@ -1,9 +1,8 @@
 import { create } from "zustand";
 import { downloadBlob } from "@/shared/lib/pdf/downloadBlob";
-import { tempFileStore } from "@/shared/lib/temp-file-store";
 import { useTransferSidebarStore } from "@/shared/model/useTransferSidebarStore";
 import { API_BASE_URL } from "@/shared/api/config";
-
+  
 export interface MergedFile {
   id: string;
   file: File;
@@ -75,8 +74,7 @@ export const useMergeStore = create<MergeState>((set, get) => ({
       await downloadBlob(mergePdfBlob, mergeFileName);
 
       const newFile = new File([mergePdfBlob], mergeFileName, { type: "application/pdf" });
-      tempFileStore.setFile(newFile);
-      useTransferSidebarStore.getState().showSidebar();
+      useTransferSidebarStore.getState().showSidebar(newFile);
 
       set({ files: [], pageCounts: {} });
       return true;

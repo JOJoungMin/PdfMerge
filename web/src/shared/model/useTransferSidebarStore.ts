@@ -1,17 +1,25 @@
 import { create } from 'zustand';
-import { tempFileStore } from '@/shared/lib/temp-file-store';
 
 interface TransferSidebarState {
   isVisible: boolean;
-  showSidebar: () => void;
+  transferFile: File | null;
+  closeInstantly: boolean;
+  showSidebar: (file?: File) => void;
   hideSidebar: () => void;
+  clearForHomePage: () => void;
+  getAndClearTransferFile: () => File | null;
 }
 
-export const useTransferSidebarStore = create<TransferSidebarState>((set) => ({
+export const useTransferSidebarStore = create<TransferSidebarState>((set, get) => ({
   isVisible: false,
-  showSidebar: () => set({ isVisible: true }),
-  hideSidebar: () => {
-    set({ isVisible: false });
-    tempFileStore.setFile(null);
+  transferFile: null,
+  closeInstantly: false,
+  showSidebar: (file) => set({ isVisible: true, transferFile: file ?? null, closeInstantly: false }),
+  hideSidebar: () => set({ isVisible: false, closeInstantly: false }),
+  clearForHomePage: () => set({ isVisible: false, transferFile: null, closeInstantly: true }),
+  getAndClearTransferFile: () => {
+    const file = get().transferFile;
+    set({ transferFile: null });
+    return file;
   },
 }));

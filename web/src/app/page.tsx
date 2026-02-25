@@ -1,11 +1,14 @@
 import { MainMenuWidget } from '@/widgets/main-menu/ui/MainMenuWidget';
+import { HomePageClearEffect } from './HomePageClearEffect';
 
 const assetPrefix = process.env.NEXT_PUBLIC_ASSET_PREFIX || '';
 const bannerUrl = `${assetPrefix}/pdf_merge_banner.png`;
 
 export default function Home() {
   return (
-    <div className="flex w-full flex-col items-center bg-gray-100 dark:bg-gray-900">
+    <>
+      <HomePageClearEffect />
+      <div className="flex w-full flex-col items-center bg-gray-100 dark:bg-gray-900">
       <section className="relative w-full h-80 bg-gray-700 text-white flex items-center justify-center overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center opacity-20"
@@ -25,5 +28,6 @@ export default function Home() {
         <MainMenuWidget />
       </div>
     </div>
+    </>
   );
 }

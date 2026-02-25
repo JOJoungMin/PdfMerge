@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: false,
   eslint: { ignoreDuringBuilds: true },
 
   // /api/* 요청을 EC2 백엔드로 프록시 (Mixed Content 방지)

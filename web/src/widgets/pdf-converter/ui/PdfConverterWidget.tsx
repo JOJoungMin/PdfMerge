@@ -7,7 +7,6 @@ import { useConvertStore } from '@/features/pdf-convert/model/useConvertStore';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
 import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
 import { downloadBlob } from '@/shared/lib/pdf/downloadBlob';
-import { tempFileStore } from '@/shared/lib/temp-file-store';
 import { API_BASE_URL } from '@/shared/api/config';
 
 const PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(
@@ -17,7 +16,6 @@ const PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(
 export default function PdfConverterWidget() {
   const { file, isConverting, error, targetFormat, setFile, setTargetFormat, convertAndGetBlob, reset } = useConvertStore();
   const [previews, setPreviews] = useState<{ [fileName: string]: string }>({});
-  const consumed = useRef(false);
   const { showSidebar } = useTransferSidebarStore();
   const { canDownload, remaining, increment } = useDownloadLimitStore();
 
@@ -35,8 +33,6 @@ export default function PdfConverterWidget() {
     } catch {}
   }, []);
 
-  useEffect(() => () => reset(), [reset]);
-
   const onFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const f = e.target.files?.[0];
@@ -49,22 +45,26 @@ export default function PdfConverterWidget() {
   );
 
   useEffect(() => {
-    if (consumed.current) return;
-    const transferred = tempFileStore.getFile();
+    const transferred = useTransferSidebarStore.getState().getAndClearTransferFile();
     if (transferred?.type === 'application/pdf') {
-      consumed.current = true;
       setFile(transferred);
       fetchPreview(transferred);
+    } else {
+      const existingFile = useConvertStore.getState().file;
+      if (existingFile) {
+        fetchPreview(existingFile);
+      } else {
+        reset();
+      }
     }
-  }, [setFile, fetchPreview]);
+  }, []);
 
   const handleConvertClick = async () => {
     if (!file || !canDownload()) return;
     const blob = await convertAndGetBlob();
     if (blob) {
       await downloadBlob(blob, `converted-${file.name.replace('.pdf', '')}.zip`);
-      tempFileStore.setFile(file);
-      showSidebar();
+      showSidebar(file);
       increment();
       setFile(null);
     }

@@ -6,31 +6,30 @@ import { DownloadBtn } from '@/shared/ui/DownloadBtn';
 import { useEditorStore } from '@/features/pdf-edit/model/useEditorStore';
 import type { PageRepresentation } from '@/features/pdf-edit/model/useEditorStore';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
-import { tempFileStore } from '@/shared/lib/temp-file-store';
+import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
 import { PdfEditorGrid } from './PdfEditorGrid';
 import { API_BASE_URL } from '@/shared/api/config';
 
 export default function PdfEditorWidget() {
   const { files, pages, isProcessing, error, addFiles, removePage, movePage, editAndDownload, reset } = useEditorStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const consumed = useRef(false);
   const [previews, setPreviews] = useState<{ [pageId: string]: string }>({});
   const prevPagesRef = useRef<PageRepresentation[]>([]);
   const { canDownload, remaining, increment } = useDownloadLimitStore();
 
   useEffect(() => useDownloadLimitStore.getState().resetIfNeeded(), []);
-  useEffect(() => () => reset(), [reset]);
 
   const handlePreviewLoad = useCallback((_pageId: string) => {}, []);
 
   useEffect(() => {
-    if (consumed.current) return;
-    const transferred = tempFileStore.getFile();
+    const transferred = useTransferSidebarStore.getState().getAndClearTransferFile();
+    const { files: storeFiles, pages: storePages } = useEditorStore.getState();
     if (transferred?.type === 'application/pdf') {
-      consumed.current = true;
       addFiles([transferred]);
+    } else if (storeFiles.length === 0 && storePages.length === 0) {
+      reset();
     }
-  }, [addFiles]);
+  }, []);
 
   useEffect(() => {
     const newPages = pages.filter((p) => !prevPagesRef.current.some((pp) => pp.id === p.id));
