@@ -9,6 +9,8 @@ export default defineConfig({
   workers: 1,
   reporter: 'html',
   globalSetup: path.join(__dirname, 'e2e', 'global-setup.ts'),
+  // EC2 대상 E2E는 백엔드 처리(압축/변환 등)가 느릴 수 있어 타임아웃 여유
+  timeout: process.env.E2E_BASE_URL ? 90_000 : 30_000,
   use: {
     baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
