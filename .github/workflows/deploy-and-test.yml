@@ -20,6 +20,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
 
       # EC2에 배포
       - name: Deploy to EC2
