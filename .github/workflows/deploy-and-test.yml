@@ -69,6 +69,8 @@ jobs:
             docker rm pdf-api 2>/dev/null || true && \
             (for c in \$(docker ps -q --filter 'publish=3001'); do docker stop \$c; done) && \
             (for c in \$(docker ps -aq --filter 'publish=3001'); do docker rm \$c; done) && \
+            (sudo fuser -k 3001/tcp 2>/dev/null || true) && \
+            (pm2 delete backend 2>/dev/null || true) && pm2 save && \
             sleep 2 && \
             docker run -d --name pdf-api -p 3001:3001 --restart unless-stopped ${IMAGE} && \
             cd web && \
