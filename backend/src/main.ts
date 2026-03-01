@@ -1,8 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-
+import { requestIdMiddleware } from './common/middleware/request-id.middleware';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
+  app.use(requestIdMiddleware);
   app.setGlobalPrefix('api')
   app.enableCors({
     origin: true,

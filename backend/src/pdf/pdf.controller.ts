@@ -8,12 +8,17 @@ import {
   BadRequestException,
   StreamableFile,
   Header,
+  Logger,
+  Request,
+  Req
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { PdfService } from './pdf.service';
 
 @Controller()
 export class PdfController {
+  private readonly logger = new Logger(PdfController.name);
+
   constructor(private readonly pdfService: PdfService) {}
 
   @Post('pdf-merge')
@@ -22,8 +27,11 @@ export class PdfController {
   )
   async merge(
     @UploadedFiles() files: Express.Multer.File[],
+    @Req() req: Request,
     @Body('githubVersion') _githubVersion?: string,
   ) {
+    const traceId = (req as any).traceId;
+    this.logger.log(`[${traceId}] pdf-merge 요청 받음`);
     if (!files?.length) {
       throw new BadRequestException('병합할 파일이 2개 이상 필요합니다.');
     }
@@ -44,6 +52,7 @@ export class PdfController {
     @Body('pages') pages: string,
     @Body('githubVersion') _githubVersion?: string,
   ) {
+    this.logger.log('pdf-edit 요청 받음');
     if (!files?.length || !pages) {
       throw new BadRequestException('필수 데이터가 누락되었습니다.');
     }
@@ -61,6 +70,7 @@ export class PdfController {
     @Body('firstPage') firstPage?: string,
     @Body('lastPage') lastPage?: string,
   ) {
+    this.logger.log('pdf-preview 요청 받음');
     if (!file) {
       throw new BadRequestException('파일이 필요합니다.');
     }
@@ -76,6 +86,7 @@ export class PdfController {
     @Body('quality') _quality?: string,
     @Body('githubVersion') _githubVersion?: string,
   ) {
+    this.logger.log('pdf-compress 요청 받음');
     if (!file) {
       throw new BadRequestException('압축할 파일이 필요합니다.');
     }
@@ -94,6 +105,7 @@ export class PdfController {
     @Body('targetFormat') targetFormat?: string,
     @Body('githubVersion') _githubVersion?: string,
   ) {
+    this.logger.log('pdf-convert 요청 받음');
     if (!file) {
       throw new BadRequestException('변환할 파일이 필요합니다.');
     }
