@@ -51,6 +51,11 @@ jobs:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_PROJECT_PATH: ${{ vars.EC2_PROJECT_PATH }}
           EC2_BACKEND_URL: ${{ vars.EC2_BACKEND_URL }}
+          DB_HOST: ${{ vars.DB_HOST }}
+          DB_PORT: ${{ vars.DB_PORT }}
+          DB_USERNAME: ${{ vars.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_DATABASE: ${{ vars.DB_DATABASE }}
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPO: ${{ env.ECR_REPOSITORY }}
           AWS_REG: ${{ env.AWS_REGION }}
@@ -72,7 +77,13 @@ jobs:
             (sudo fuser -k 3001/tcp 2>/dev/null || true) && \
             (pm2 delete backend 2>/dev/null || true) && pm2 save && \
             sleep 2 && \
-            docker run -d --name pdf-api -p 3001:3001 --restart unless-stopped ${IMAGE} && \
+            docker run -d --name pdf-api -p 3001:3001 --restart unless-stopped \
+              -e DB_HOST='${DB_HOST}' \
+              -e DB_PORT='${DB_PORT}' \
+              -e DB_USERNAME='${DB_USERNAME}' \
+              -e DB_PASSWORD='${DB_PASSWORD}' \
+              -e DB_DATABASE='${DB_DATABASE}' \
+              ${IMAGE} && \
             cd web && \
             npm ci && \
             NEXT_PUBLIC_API_URL=${EC2_BACKEND_URL} npm run build && \

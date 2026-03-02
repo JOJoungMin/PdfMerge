@@ -9,9 +9,11 @@ out/
 dist/
 build/
 
-# Env
+# Env (절대 커밋 금지)
 .env
+.env.*
 .env*.local
+!.env.example
 
 # IDE
 .idea/
@@ -31,6 +33,9 @@ npm-debug.log*
 pdfmerge/
 mysql-data/
 
+# DB 스키마 (로컬 실행용, Git 제외)
+backend/sql/
+
 # Playwright
 test-results/
 playwright-report/
@@ -43,3 +48,6 @@ blob-report/
 
 # 로컬 캐시
 .cache/
+
+# 면접 답변 정리 (로컬 확인용, Git 제외)
+interview-qa.md

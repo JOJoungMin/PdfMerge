@@ -30,6 +30,12 @@ export default function RootLayout({
                     <span>PDF-Utils</span>
                   </Link>
                 </div>
+                <Link
+                  href="/admin"
+                  className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  관리자
+                </Link>
               </div>
             </nav>
           </header>
