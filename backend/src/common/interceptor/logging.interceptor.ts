@@ -63,6 +63,11 @@ export class LoggingInterceptor implements NestInterceptor {
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [traceId, method, url, statusCode, elapsedMs, level, errorMessage],
       )
-      .catch((e) => this.logger.error('request_logs INSERT 실패', e));
+      .catch((e: unknown) => {
+        const err = e as Error & { code?: string; sqlMessage?: string };
+        this.logger.error(
+          `request_logs INSERT 실패: ${err.sqlMessage || err.message || err.code || JSON.stringify(e)}`,
+        );
+      });
   }
 }

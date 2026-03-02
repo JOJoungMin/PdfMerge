@@ -82,10 +82,11 @@ export class AdminController {
         offset: offsetNum,
       };
     } catch (e) {
-      const err = e as Error & { code?: string; sqlMessage?: string };
-      throw new InternalServerErrorException(
-        err.sqlMessage || err.message || 'DB 조회 실패',
-      );
+      const err = e as Error & { code?: string; sqlMessage?: string; errno?: number };
+      const msg = [err.sqlMessage, err.message, err.code, err.errno]
+        .filter(Boolean)
+        .join(' | ') || JSON.stringify(err);
+      throw new InternalServerErrorException(msg);
     }
   }
 }
