@@ -19,7 +19,7 @@ export const DB_POOL = 'DB_POOL';
           database: process.env.DB_DATABASE || 'mergepdf',
           waitForConnections: true,
           connectionLimit: 10,
-          ...(isRds && { ssl: { rejectUnauthorized: true } }),
+          ...(isRds && { ssl: { rejectUnauthorized: false } }),
         });
       },
     },

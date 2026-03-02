@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Inject } from '@nestjs/common';
+import { Controller, Get, Query, Inject, InternalServerErrorException } from '@nestjs/common';
 import { DB_POOL } from '../database/database.module';
 import type { Pool } from 'mysql2/promise';
 
@@ -59,26 +59,33 @@ export class AdminController {
     const validSortBy = ['created_at', 'elapsed_ms', 'status_code', 'level'].includes(sortBy) ? sortBy : 'created_at';
     const validOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
 
-    const [rows] = await this.pool.query(
-      `SELECT id, trace_id, method, url, status_code, elapsed_ms, level, error_message, created_at
-       FROM request_logs
-       ${whereClause}
-       ORDER BY ${validSortBy} ${validOrder}
-       LIMIT ? OFFSET ?`,
-      [...params, limitNum, offsetNum],
-    );
+    try {
+      const [rows] = await this.pool.query(
+        `SELECT id, trace_id, method, url, status_code, elapsed_ms, level, error_message, created_at
+         FROM request_logs
+         ${whereClause}
+         ORDER BY ${validSortBy} ${validOrder}
+         LIMIT ? OFFSET ?`,
+        [...params, limitNum, offsetNum],
+      );
 
-    const [countRows] = await this.pool.query(
-      `SELECT COUNT(*) as total FROM request_logs ${whereClause}`,
-      params,
-    );
-    const total = (countRows as { total: number }[])[0]?.total ?? 0;
+      const [countRows] = await this.pool.query(
+        `SELECT COUNT(*) as total FROM request_logs ${whereClause}`,
+        params,
+      );
+      const total = (countRows as { total: number }[])[0]?.total ?? 0;
 
-    return {
-      data: rows,
-      total: Number(total),
-      limit: limitNum,
-      offset: offsetNum,
-    };
+      return {
+        data: rows,
+        total: Number(total),
+        limit: limitNum,
+        offset: offsetNum,
+      };
+    } catch (e) {
+      const err = e as Error & { code?: string; sqlMessage?: string };
+      throw new InternalServerErrorException(
+        err.sqlMessage || err.message || 'DB 조회 실패',
+      );
+    }
   }
 }
