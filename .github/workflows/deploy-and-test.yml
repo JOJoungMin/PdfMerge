@@ -51,11 +51,11 @@ jobs:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_PROJECT_PATH: ${{ vars.EC2_PROJECT_PATH }}
           EC2_BACKEND_URL: ${{ vars.EC2_BACKEND_URL }}
-          DB_HOST: ${{ vars.DB_HOST }}
-          DB_PORT: ${{ vars.DB_PORT }}
-          DB_USERNAME: ${{ vars.DB_USERNAME }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_DATABASE: ${{ vars.DB_DATABASE }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPO: ${{ env.ECR_REPOSITORY }}
           AWS_REG: ${{ env.AWS_REGION }}
