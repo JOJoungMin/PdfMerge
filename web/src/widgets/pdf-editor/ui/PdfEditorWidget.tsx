@@ -1,21 +1,23 @@
 'use client';
 
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { UploadCloud } from 'lucide-react';
+import { Upload, UploadCloud } from 'lucide-react';
 import { DownloadBtn } from '@/shared/ui/DownloadBtn';
 import { useEditorStore } from '@/features/pdf-edit/model/useEditorStore';
 import type { PageRepresentation } from '@/features/pdf-edit/model/useEditorStore';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
 import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
+import { formatSize } from '@/shared/lib/formatSize';
 import { PdfEditorGrid } from './PdfEditorGrid';
 import { API_BASE_URL } from '@/shared/api/config';
 
 export default function PdfEditorWidget() {
   const { files, pages, isProcessing, error, addFiles, removePage, movePage, editAndDownload, reset } = useEditorStore();
+  const { showSidebar } = useTransferSidebarStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<{ [pageId: string]: string }>({});
   const prevPagesRef = useRef<PageRepresentation[]>([]);
-  const { canDownload, remaining, increment } = useDownloadLimitStore();
+  const { canDownload } = useDownloadLimitStore();
 
   useEffect(() => useDownloadLimitStore.getState().resetIfNeeded(), []);
 
@@ -72,60 +74,98 @@ export default function PdfEditorWidget() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleEditClick = async () => {
-    if (pages.length === 0 || !canDownload()) return;
-    const success = await editAndDownload();
-    if (success) increment();
+  const handleFileSelect = (fileList: FileList | null) => {
+    if (fileList?.length) addFiles(Array.from(fileList).filter((f) => f.type === 'application/pdf'));
   };
 
-  const remainingCount = remaining();
+  const handleEditClick = async () => {
+    if (pages.length === 0 || !canDownload()) return;
+    const pageCount = pages.length;
+    const resultFile = await editAndDownload();
+    if (resultFile) {
+      showSidebar(resultFile, {
+        title: 'PDF 생성 완료',
+        lines: [`결과 ${formatSize(resultFile.size)}`, `${pageCount}페이지`],
+      });
+    }
+  };
 
-  return (
-    <div className="w-full max-w-6xl rounded-lg bg-white p-8 shadow-md dark:bg-gray-800">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">PDF 편집기</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">여러 PDF를 올리고, 페이지를 재정렬하거나 삭제하여 새로운 PDF를 만드세요.</p>
-      </div>
+  const hasPages = pages.length > 0;
 
-      {pages.length === 0 && (
-        <label
-          htmlFor="file-upload"
-          className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600"
+  /* 최초 화면: 병합기 스타일 업로드 UI */
+  if (!hasPages) {
+    return (
+      <div className="w-full max-w-2xl mx-auto rounded-lg bg-white p-4 md:p-8 shadow-md dark:bg-gray-800">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-white">PDF 분리</h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">PDF 파일을 드래그하거나 클릭해서 업로드하세요.</p>
+        </div>
+        <div
+          className="mt-8 flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-12 text-center hover:border-blue-500 dark:border-gray-600 dark:hover:border-blue-400 transition-colors"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleFileSelect(e.dataTransfer.files);
+          }}
+          onClick={() => fileInputRef.current?.click()}
         >
-          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-            <UploadCloud className="w-10 h-10 mb-3 text-gray-400" />
-            <p className="mb-2 text-sm text-gray-500 dark:text-gray-400"><span className="font-semibold">클릭하여 업로드</span> 또는 드래그 앤 드롭</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">PDF 파일 (여러 개 선택 가능)</p>
+          <Upload className="mb-2 h-10 w-10 text-gray-500" />
+          <span className="font-semibold text-gray-600 dark:text-gray-400">파일 선택</span>
+          <p className="text-sm text-gray-500">또는 파일을 여기로 드래그하세요</p>
+        </div>
+        <input id="file-upload" type="file" className="hidden" onChange={onFileChange} accept=".pdf" ref={fileInputRef} multiple />
+        {error && <p className="mt-4 text-center text-red-500 dark:text-red-400">오류: {error}</p>}
+      </div>
+    );
+  }
+
+  /* 파일 업로드 후: 사이드바 + 중앙 그리드 */
+  return (
+    <div className="flex w-full min-h-screen">
+      <aside className="relative z-50 w-64 shrink-0 flex flex-col border-r border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-700">
+          <h1 className="text-lg font-bold text-gray-800 dark:text-white">PDF 분리</h1>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">페이지 추출·재정렬·삭제</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm">{error}</div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">파일 / 페이지</label>
+            <p className="text-xs text-gray-700 dark:text-gray-300">{files.length}개 파일, {pages.length}페이지</p>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="mt-2 flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              <UploadCloud className="h-4 w-4" />
+              파일 추가
+            </button>
           </div>
-        </label>
-      )}
 
-      <input id="file-upload" type="file" className="hidden" onChange={onFileChange} accept=".pdf" ref={fileInputRef} multiple />
-
-      {error && (
-        <div className="mt-4 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg text-center"><p>{error}</p></div>
-      )}
-
-      {pages.length > 0 && (
-        <>
-          <div className="mt-6 text-center">
-            <DownloadBtn
-              text={isProcessing ? 'PDF 생성 중...' : `PDF 생성 및 다운로드 (${remainingCount}회 남음)`}
-              isLoading={isProcessing}
-              disabled={isProcessing || pages.length === 0 || !canDownload()}
-              onClick={handleEditClick}
-            />
-          </div>
-          <PdfEditorGrid
-            pages={pages}
-            previews={previews}
-            removePage={removePage}
-            movePage={movePage}
-            onAddFileClick={() => fileInputRef.current?.click()}
-            onPreviewLoad={handlePreviewLoad}
+          <DownloadBtn
+            text={isProcessing ? 'PDF 생성 중...' : 'PDF 생성하기'}
+            isLoading={isProcessing}
+            disabled={isProcessing || pages.length === 0 || !canDownload()}
+            onClick={handleEditClick}
+            className="w-full"
           />
-        </>
-      )}
+        </div>
+      </aside>
+
+      <main className="flex-1 min-h-0 p-6 overflow-auto bg-gray-50 dark:bg-gray-900/50">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">페이지를 드래그하여 순서를 바꾸거나, × 버튼으로 삭제할 수 있습니다.</p>
+        <PdfEditorGrid
+          pages={pages}
+          previews={previews}
+          removePage={removePage}
+          movePage={movePage}
+          onAddFileClick={() => fileInputRef.current?.click()}
+          onPreviewLoad={handlePreviewLoad}
+        />
+      </main>
     </div>
   );
 }

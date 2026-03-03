@@ -98,6 +98,28 @@ export class PdfController {
     });
   }
 
+  @Post('pdf-rotate')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
+  async rotate(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('angle') angleStr?: string,
+  ) {
+    this.logger.log('pdf-rotate 요청 받음');
+    if (!file) {
+      throw new BadRequestException('회전할 파일이 필요합니다.');
+    }
+    const angle = parseInt(angleStr ?? '90', 10);
+    if (![90, 180, 270].includes(angle)) {
+      throw new BadRequestException('회전 각도는 90, 180, 270 중 하나여야 합니다.');
+    }
+    const buffer = await this.pdfService.rotate(file, angle as 90 | 180 | 270);
+    const filename = `rotated-${file.originalname || 'document.pdf'}`;
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    });
+  }
+
   @Post('pdf-convert')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
   async convert(

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('페이지 이동', () => {
-  test('메인 → 병합 → 압축 → 변환 → 편집 → 메인 순서로 이동', async ({ page }) => {
+  test('메인 → 병합 → 압축 → 변환 → 편집 → 회전 → 메인 순서로 이동', async ({ page }) => {
     await page.goto('/');
 
     // 메인 페이지
@@ -32,7 +32,14 @@ test.describe('페이지 이동', () => {
     await expect(page).toHaveURL('/');
     await page.getByRole('link', { name: /PDF 분리/ }).first().click();
     await expect(page).toHaveURL('/editor');
-    await expect(page.locator('h1')).toContainText('PDF 편집기');
+    await expect(page.locator('h1')).toContainText('PDF 분리');
+
+    // 회전 페이지로
+    await page.getByRole('link', { name: 'PDF-Utils' }).first().click();
+    await expect(page).toHaveURL('/');
+    await page.getByRole('link', { name: /PDF 회전/ }).first().click();
+    await expect(page).toHaveURL('/rotate');
+    await expect(page.locator('h1')).toContainText('PDF 회전');
 
     // 메인으로 복귀
     await page.getByRole('link', { name: 'PDF-Utils' }).first().click();

@@ -4,6 +4,8 @@ import "./globals.css";
 import Link from "next/link";
 import { FileJson } from "lucide-react";
 import TransferSidebar from "@/widgets/transfer-sidebar/ui/TransferSidebar";
+import ResultCenterPreview from "@/widgets/transfer-sidebar/ui/ResultCenterPreview";
+import DownloadLoadingOverlay from "@/shared/ui/DownloadLoadingOverlay";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -30,12 +32,6 @@ export default function RootLayout({
                     <span>PDF-Utils</span>
                   </Link>
                 </div>
-                <Link
-                  href="/admin"
-                  className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  관리자
-                </Link>
               </div>
             </nav>
           </header>
@@ -44,6 +40,8 @@ export default function RootLayout({
           </main>
         </div>
         <TransferSidebar />
+        <ResultCenterPreview />
+        <DownloadLoadingOverlay />
       </body>
     </html>
   );

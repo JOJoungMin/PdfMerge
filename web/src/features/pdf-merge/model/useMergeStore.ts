@@ -1,8 +1,6 @@
 import { create } from "zustand";
-import { downloadBlob } from "@/shared/lib/pdf/downloadBlob";
-import { useTransferSidebarStore } from "@/shared/model/useTransferSidebarStore";
 import { API_BASE_URL } from "@/shared/api/config";
-  
+
 export interface MergedFile {
   id: string;
   file: File;
@@ -16,7 +14,7 @@ interface MergeState {
   addFiles: (files: File[]) => void;
   removeFile: (id: string) => void;
   setPageCount: (id: string, count: number) => void;
-  mergeAndDownload: (mergeFileName: string) => Promise<boolean>;
+  mergeAndDownload: (mergeFileName: string) => Promise<File | null>;
   reset: () => void;
 }
 
@@ -71,20 +69,16 @@ export const useMergeStore = create<MergeState>((set, get) => ({
       }
 
       const mergePdfBlob = await response.blob();
-      await downloadBlob(mergePdfBlob, mergeFileName);
-
       const newFile = new File([mergePdfBlob], mergeFileName, { type: "application/pdf" });
-      useTransferSidebarStore.getState().showSidebar(newFile);
-
       set({ files: [], pageCounts: {} });
-      return true;
+      return newFile;
     } catch (e: unknown) {
       if (e instanceof Error) {
         set({ error: e.message });
       } else {
         set({ error: "알 수 없는 오류가 발생했습니다." });
       }
-      return false;
+      return null;
     } finally {
       set({ isMerging: false });
     }

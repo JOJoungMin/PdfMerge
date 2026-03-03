@@ -1,13 +1,22 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
+import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
 import { useRouter } from 'next/navigation';
-import { X, FileUp, Shrink, ArrowRightLeft, Edit } from 'lucide-react';
+import { X, FileUp, Shrink, ArrowRightLeft, Edit, RotateCw, Download } from 'lucide-react';
+import { downloadBlob } from '@/shared/lib/pdf/downloadBlob';
 
 export default function TransferSidebar() {
-  const { isVisible, closeInstantly, hideSidebar } = useTransferSidebarStore();
+  const { isVisible, transferFile, transferSummary, closeInstantly, hideSidebar } = useTransferSidebarStore();
+  const { canDownload, increment } = useDownloadLimitStore();
   const router = useRouter();
+
+  const handleDownload = useCallback(async () => {
+    if (!transferFile || !canDownload()) return;
+    await downloadBlob(transferFile, transferFile.name);
+    increment();
+  }, [transferFile, canDownload, increment]);
 
   useEffect(() => {
     return () => {
@@ -22,8 +31,10 @@ export default function TransferSidebar() {
 
   return (
     <div
-      className="fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-lg p-4 flex flex-col dark:bg-gray-800"
+      className="fixed left-0 z-50 w-96 bg-blue-50 shadow-xl border-r border-blue-100 p-4 flex flex-col dark:bg-blue-950/40 dark:border-blue-900/60"
       style={{
+        top: '4rem',
+        bottom: 0,
         transform: isVisible ? 'translateX(0)' : 'translateX(-100%)',
         transition: closeInstantly ? 'none' : 'transform 0.3s ease-in-out',
         pointerEvents: isVisible ? 'auto' : 'none',
@@ -35,6 +46,33 @@ export default function TransferSidebar() {
           <X size={24} />
         </button>
       </div>
+
+      {transferFile && (
+        <div className="mb-4">
+          {transferSummary && (
+            <div className="mb-3 p-3 rounded-lg bg-white/80 dark:bg-gray-800/80 border border-blue-100 dark:border-blue-900/50">
+              <p className="text-sm font-semibold text-gray-800 dark:text-white mb-1.5">{transferSummary.title}</p>
+              <ul className="text-xs text-gray-600 dark:text-gray-300 space-y-0.5">
+                {transferSummary.lines.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p className="mb-2 text-sm font-medium text-gray-800 dark:text-gray-200 truncate" title={transferFile.name}>
+            {transferFile.name}
+          </p>
+          <button
+            onClick={handleDownload}
+            disabled={!canDownload()}
+            className="w-full py-2.5 px-4 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          >
+            <Download size={18} />
+            다운로드
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col space-y-3">
         <button onClick={() => handleTransfer('/merge')} className="flex items-center justify-center p-3 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors">
           <FileUp size={20} className="mr-2" />
@@ -51,6 +89,10 @@ export default function TransferSidebar() {
         <button onClick={() => handleTransfer('/editor')} className="flex items-center justify-center p-3 rounded-md bg-yellow-500 text-white hover:bg-yellow-600 transition-colors">
           <Edit size={20} className="mr-2" />
           <span>PDF 편집</span>
+        </button>
+        <button onClick={() => handleTransfer('/rotate')} className="flex items-center justify-center p-3 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 transition-colors">
+          <RotateCw size={20} className="mr-2" />
+          <span>PDF 회전</span>
         </button>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, degrees } from 'pdf-lib';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { promises as fs } from 'fs';
@@ -114,6 +114,19 @@ export class PdfService {
     } finally {
       await fs.rm(tempDir, { recursive: true, force: true });
     }
+  }
+
+  /** PDF 회전 (pdf-lib만 사용) - 모든 페이지를 동일 각도로 회전 */
+  async rotate(file: Express.Multer.File, angle: 90 | 180 | 270): Promise<Buffer> {
+    if (!file) throw new Error('회전할 파일이 필요합니다.');
+    const pdfDoc = await PDFDocument.load(file.buffer);
+    const pages = pdfDoc.getPages();
+    const rotation = angle === 90 ? degrees(90) : angle === 180 ? degrees(180) : degrees(270);
+    for (const page of pages) {
+      page.setRotation(rotation);
+    }
+    const bytes = await pdfDoc.save();
+    return Buffer.from(bytes);
   }
 
   /** PDF → 이미지 ZIP (Ghostscript + jszip) */

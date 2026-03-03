@@ -1,6 +1,4 @@
 import { create } from 'zustand';
-import { downloadBlob } from '@/shared/lib/pdf/downloadBlob';
-import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
 import { API_BASE_URL } from '@/shared/api/config';
 
 export interface EditedFile {
@@ -23,7 +21,7 @@ interface EditorState {
   addFiles: (newFiles: File[]) => Promise<void>;
   removePage: (pageId: string) => void;
   movePage: (dragIndex: number, hoverIndex: number) => void;
-  editAndDownload: () => Promise<boolean>;
+  editAndDownload: () => Promise<File | null>;
   reset: () => void;
 }
 
@@ -112,16 +110,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       const blob = await response.blob();
-      await downloadBlob(blob, 'edited-document.pdf');
-
       const newFile = new File([blob], 'edited-document.pdf', { type: 'application/pdf' });
-      useTransferSidebarStore.getState().showSidebar(newFile);
-
       set(initialState);
-      return true;
+      return newFile;
     } catch (e: unknown) {
       set({ error: e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.' });
-      return false;
+      return null;
     } finally {
       set({ isProcessing: false });
     }

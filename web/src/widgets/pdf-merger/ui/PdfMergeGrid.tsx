@@ -20,11 +20,10 @@ interface PdfMergeGridProps {
 export function PdfMergeGrid({ files, previews, pageCounts, handleRemoveFile, onAddFileClick, onPreviewLoad }: PdfMergeGridProps) {
   return (
     <div className="mt-8">
-      <div className="grid grid-cols-5 gap-3 justify-center">
+      <div className="flex flex-wrap items-start gap-8">
         {files.map((mf) => (
-          <div key={mf.id} className="flex items-start space-x-4">
-            <div className="flex flex-col items-center">
-              <div className="relative w-80 h-96 group">
+          <div key={mf.id} className="flex flex-col items-center">
+            <div className="relative w-80 h-96 group">
                 <img
                   src={previews[mf.id] || PLACEHOLDER_SVG}
                   alt={`${mf.file.name} preview`}
@@ -38,25 +37,22 @@ export function PdfMergeGrid({ files, previews, pageCounts, handleRemoveFile, on
                   <X size={64} />
                 </button>
               </div>
-              <div className="mt-2 text-center">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate w-80" title={mf.file.name}>
-                  {mf.file.name}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{pageCounts[mf.id] ? `${pageCounts[mf.id]}p` : '...'}</p>
-              </div>
+            <div className="mt-2 text-center">
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate w-80" title={mf.file.name}>
+                {mf.file.name}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{pageCounts[mf.id] ? `${pageCounts[mf.id]}p` : '...'}</p>
             </div>
           </div>
         ))}
-        <div className="flex items-start space-x-4">
-          <button
-            onClick={onAddFileClick}
-            className="w-80 h-96 bg-gray-100 dark:bg-gray-700 rounded-md flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 dark:border-gray-600 dark:hover:border-blue-400"
-          >
-            <Upload className="mb-2 h-12 w-12 text-gray-500" />
-            <span className="font-semibold text-gray-600">파일 추가</span>
-            <p className="text-sm text-gray-500">또는 파일을 여기로 드래그하세요</p>
-          </button>
-        </div>
+        <button
+          onClick={onAddFileClick}
+          className="w-80 h-96 bg-gray-100 dark:bg-gray-700 rounded-md flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 dark:border-gray-600 dark:hover:border-blue-400 shrink-0"
+        >
+          <Upload className="mb-2 h-12 w-12 text-gray-500" />
+          <span className="font-semibold text-gray-600 dark:text-gray-400">파일 추가</span>
+          <p className="text-sm text-gray-500 dark:text-gray-400">또는 파일을 여기로 드래그하세요</p>
+        </button>
       </div>
     </div>
   );

@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { UploadCloud, File as FileIcon } from 'lucide-react';
+import { Upload, File as FileIcon } from 'lucide-react';
 import { DownloadBtn } from '@/shared/ui/DownloadBtn';
 import { useCompressStore } from '@/features/pdf-compress/model/useCompressStore';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
 import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
-import { downloadBlob } from '@/shared/lib/pdf/downloadBlob';
+import { formatSize } from '@/shared/lib/formatSize';
 import { API_BASE_URL } from '@/shared/api/config';
 
 const PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(
@@ -17,7 +17,8 @@ export default function PdfCompressorWidget() {
   const { file, isCompressing, error, quality, compressionResult, setFile, setQuality, compressAndGetBlob, reset } = useCompressStore();
   const [previews, setPreviews] = useState<{ [fileName: string]: string[] }>({});
   const { showSidebar } = useTransferSidebarStore();
-  const { canDownload, remaining, increment } = useDownloadLimitStore();
+  const { canDownload } = useDownloadLimitStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => useDownloadLimitStore.getState().resetIfNeeded(), []);
 
@@ -32,26 +33,42 @@ export default function PdfCompressorWidget() {
     } catch {}
   }, []);
 
-  const onFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const f = e.target.files?.[0];
+  const applyFile = useCallback(
+    (f: File | null) => {
       if (f) {
         setFile(f);
         fetchPreview(f);
+      } else {
+        setFile(null);
       }
     },
     [setFile, fetchPreview]
   );
 
+  const onFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0];
+      if (f?.type === 'application/pdf') applyFile(f);
+    },
+    [applyFile]
+  );
+
+  const handleFileSelect = useCallback(
+    (fileList: FileList | null) => {
+      const f = fileList?.[0];
+      if (f?.type === 'application/pdf') applyFile(f);
+    },
+    [applyFile]
+  );
+
   useEffect(() => {
     const transferred = useTransferSidebarStore.getState().getAndClearTransferFile();
-    if (transferred) {
-      setFile(transferred);
-      fetchPreview(transferred);
+    if (transferred?.type === 'application/pdf') {
+      applyFile(transferred);
     } else {
       const existingFile = useCompressStore.getState().file;
       if (existingFile) {
-        fetchPreview(existingFile);
+        applyFile(existingFile);
       } else {
         reset();
       }
@@ -62,52 +79,88 @@ export default function PdfCompressorWidget() {
     if (!file || !canDownload()) return;
     const blob = await compressAndGetBlob();
     if (blob) {
-      await downloadBlob(blob, `compressed-${file.name}`);
-      showSidebar(new File([blob], `compressed-${file.name}`, { type: 'application/pdf' }));
-      increment();
+      const result = useCompressStore.getState().compressionResult;
+      const summary = result
+        ? {
+            title: '압축 완료',
+            lines: [
+              `원본 ${formatSize(result.originalSize)}`,
+              `압축 후 ${formatSize(result.compressedSize)}`,
+              `약 ${result.reduction}% 감소`,
+            ],
+          }
+        : undefined;
+      showSidebar(
+        new File([blob], `compressed-${file.name}`, { type: 'application/pdf' }),
+        summary
+      );
       setFile(null);
     }
   };
 
-  const remainingCount = remaining();
+  const clearFile = () => setFile(null);
+  const hasFile = !!file;
+  const pagePreviews = file ? (previews[file.name] ?? []) : [];
 
-  return (
-    <div className="w-full max-w-4xl rounded-lg bg-white p-8 shadow-md dark:bg-gray-800">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">PDF 압축</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">PDF 파일의 이미지 품질을 낮춰 파일 크기를 줄입니다.</p>
-      </div>
-
-      {!file && (
-        <label
-          htmlFor="file-upload"
-          className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600"
-        >
-          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-            <UploadCloud className="w-10 h-10 mb-3 text-gray-400" />
-            <p className="mb-2 text-sm text-gray-500 dark:text-gray-400"><span className="font-semibold">클릭하여 업로드</span> 또는 드래그 앤 드롭</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">PDF 파일</p>
-          </div>
-          <input id="file-upload" type="file" className="hidden" onChange={onFileChange} accept=".pdf" />
-        </label>
-      )}
-
-      {error && (
-        <div className="mt-4 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg text-center"><p>{error}</p></div>
-      )}
-
-      {file && (
+  /* 최초 화면: 병합기 스타일 업로드 UI */
+  if (!hasFile) {
+    return (
+      <div className="w-full max-w-2xl mx-auto rounded-lg bg-white p-4 md:p-8 shadow-md dark:bg-gray-800">
         <div className="text-center">
-          <div className="flex justify-between items-center mb-4 p-3 rounded-md bg-gray-100 dark:bg-gray-700">
-            <div className="flex items-center min-w-0">
-              <FileIcon className="mr-2 h-5 w-5 flex-shrink-0 text-blue-500" />
-              <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">{file.name}</span>
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-white">PDF 압축</h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">PDF 파일을 드래그하거나 클릭해서 업로드하세요.</p>
+        </div>
+        <div
+          className="mt-8 flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-12 text-center hover:border-blue-500 dark:border-gray-600 dark:hover:border-blue-400 transition-colors"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleFileSelect(e.dataTransfer.files);
+          }}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload className="mb-2 h-10 w-10 text-gray-500" />
+          <span className="font-semibold text-gray-600 dark:text-gray-400">파일 선택</span>
+          <p className="text-sm text-gray-500">또는 파일을 여기로 드래그하세요</p>
+        </div>
+        <input
+          id="file-upload"
+          type="file"
+          accept=".pdf"
+          ref={fileInputRef}
+          className="hidden"
+          onChange={onFileChange}
+        />
+        {error && <p className="mt-4 text-center text-red-500 dark:text-red-400">오류: {error}</p>}
+      </div>
+    );
+  }
+
+  /* 파일 업로드 후: 사이드바 + 중앙 미리보기 */
+  return (
+    <div className="flex w-full min-h-screen">
+      <aside className="relative z-50 w-64 shrink-0 flex flex-col border-r border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-700">
+          <h1 className="text-lg font-bold text-gray-800 dark:text-white">PDF 압축</h1>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">이미지 품질 조절로 용량 축소</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm">{error}</div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">파일</label>
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-gray-100 dark:bg-gray-700">
+              <FileIcon className="h-4 w-4 flex-shrink-0 text-blue-500" />
+              <span className="text-xs truncate text-gray-700 dark:text-gray-200" title={file.name}>{file.name}</span>
             </div>
-            <button onClick={() => setFile(null)} className="text-sm text-blue-600 hover:underline flex-shrink-0 ml-2">파일 변경</button>
+            <button onClick={clearFile} className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline">파일 변경</button>
           </div>
 
-          <div className="my-6">
-            <label htmlFor="quality" className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">압축 품질</label>
+          <div>
+            <label htmlFor="quality" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">압축 품질</label>
             <input
               id="quality"
               type="range"
@@ -118,34 +171,50 @@ export default function PdfCompressorWidget() {
               onChange={(e) => setQuality(parseFloat(e.target.value))}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
             />
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">낮음 (파일 크기 작음) &lt;--&gt; 높음 (원본 품질)</div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">낮음 ← → 높음 (원본 품질)</p>
           </div>
 
           {compressionResult && (
-            <div className="mt-6 text-lg space-y-2">
-              <p>원본 크기: <span className="font-mono">{(compressionResult.originalSize / 1024 / 1024).toFixed(2)} MB</span></p>
-              <p>압축된 크기: <span className="font-mono">{(compressionResult.compressedSize / 1024 / 1024).toFixed(2)} MB</span></p>
-              <p className="font-bold text-green-600">감소량: {compressionResult.reduction}%</p>
+            <div className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
+              <p>원본: <span className="font-mono">{(compressionResult.originalSize / 1024 / 1024).toFixed(2)} MB</span></p>
+              <p>압축: <span className="font-mono">{(compressionResult.compressedSize / 1024 / 1024).toFixed(2)} MB</span></p>
+              <p className="font-semibold text-green-600 dark:text-green-400">감소: {compressionResult.reduction}%</p>
             </div>
           )}
-        </div>
-      )}
 
-      <div className="mt-8 text-center">
-        <DownloadBtn text={`압축 및 다운로드 (${remainingCount}회 남음)`} isLoading={isCompressing} disabled={!file || isCompressing || !canDownload()} onClick={handleCompressClick} />
-      </div>
+          <DownloadBtn
+            text={isCompressing ? '압축 중...' : '압축하기'}
+            isLoading={isCompressing}
+            disabled={!file || isCompressing || !canDownload()}
+            onClick={handleCompressClick}
+            className="w-full"
+          />
+        </div>
+      </aside>
 
-      {file && (previews[file.name]?.length ? (
-        <div className="mt-4 flex flex-wrap gap-2 justify-center">
-          {previews[file.name].map((src, idx) => (
-            <img key={idx} src={src} alt={`Page ${idx + 1}`} className="w-32 h-44 object-cover border rounded" />
-          ))}
+      <main className="flex-1 flex flex-col items-center justify-center min-h-0 p-6 overflow-auto bg-gray-50 dark:bg-gray-900/50">
+        <div className="flex flex-col items-center w-full max-w-4xl">
+          <div className="flex items-center justify-center min-h-[300px] w-full">
+            <div className="flex flex-wrap gap-3 justify-center">
+              {pagePreviews.length ? (
+                pagePreviews.map((src, idx) => (
+                  <img
+                    key={idx}
+                    src={src}
+                    alt={`페이지 ${idx + 1}`}
+                    className="max-h-[70vh] w-auto object-contain border rounded-lg shadow-lg bg-white"
+                  />
+                ))
+              ) : (
+                <img src={PLACEHOLDER} alt="미리보기" className="max-h-[70vh] rounded-lg border" />
+              )}
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-gray-500 dark:text-gray-400 truncate max-w-full" title={file.name}>
+            {file.name}
+          </p>
         </div>
-      ) : (
-        <div className="mt-4 flex justify-center">
-          <img src={PLACEHOLDER} alt="미리보기" className="w-32 h-44 object-cover border rounded" />
-        </div>
-      ))}
+      </main>
     </div>
   );
 }
