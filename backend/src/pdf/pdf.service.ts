@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PDFDocument, degrees } from 'pdf-lib';
+import { PDFDocument, degrees, StandardFonts, rgb } from 'pdf-lib';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { promises as fs } from 'fs';
@@ -116,14 +116,18 @@ export class PdfService {
     }
   }
 
-  /** PDF 회전 (pdf-lib만 사용) - 모든 페이지를 동일 각도로 회전 */
-  async rotate(file: Express.Multer.File, angle: 90 | 180 | 270): Promise<Buffer> {
+  /** PDF 회전 (pdf-lib만 사용). pageIndex 있으면 해당 페이지만 회전, 없으면 전체 동일 각도 */
+  async rotate(file: Express.Multer.File, angle: 90 | 180 | 270, pageIndex?: number): Promise<Buffer> {
     if (!file) throw new Error('회전할 파일이 필요합니다.');
     const pdfDoc = await PDFDocument.load(file.buffer);
     const pages = pdfDoc.getPages();
     const rotation = angle === 90 ? degrees(90) : angle === 180 ? degrees(180) : degrees(270);
-    for (const page of pages) {
-      page.setRotation(rotation);
+    if (pageIndex != null && pageIndex >= 0 && pageIndex < pages.length) {
+      pages[pageIndex].setRotation(rotation);
+    } else {
+      for (const page of pages) {
+        page.setRotation(rotation);
+      }
     }
     const bytes = await pdfDoc.save();
     return Buffer.from(bytes);
@@ -161,6 +165,91 @@ export class PdfService {
       contentType: 'application/zip',
       filename: 'images-to-pdf.zip',
     };
+  }
+
+  /** 페이지 번호 넣기 (pdf-lib만 사용) */
+  async addPageNumbers(
+    file: Express.Multer.File,
+    opts: {
+      position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+      margin: 'narrow' | 'medium' | 'wide';
+      startPage: number;
+      endPage: number;
+      startNumber: number;
+      textFormat: 'number-only' | 'n-of-total';
+      padding: 1 | 2 | 3;
+    },
+  ): Promise<Buffer> {
+    if (!file) throw new Error('PDF 파일이 필요합니다.');
+    const doc = await PDFDocument.load(file.buffer);
+    const font = await doc.embedStandardFont(StandardFonts.Helvetica);
+    const pages = doc.getPages();
+    const totalPages = pages.length;
+    const fontSize = 12;
+    const marginPt = opts.margin === 'narrow' ? 12 : opts.margin === 'wide' ? 28 : 20;
+
+    const formatNum = (n: number, total: number): string => {
+      const pad = (v: number) => {
+        const s = String(v);
+        if (opts.padding === 2) return s.padStart(2, '0');
+        if (opts.padding === 3) return s.padStart(3, '0');
+        return s;
+      };
+      if (opts.textFormat === 'n-of-total') return `${pad(n)} / ${total}`;
+      return pad(n);
+    };
+
+    const start = Math.max(1, Math.min(opts.startPage, totalPages));
+    const end = Math.max(start, Math.min(opts.endPage, totalPages));
+    const totalInRange = end - start + 1;
+
+    for (let i = start - 1; i < end; i++) {
+      const page = pages[i];
+      const pageNum = opts.startNumber + (i - (start - 1));
+      const text = formatNum(pageNum, totalInRange);
+      const textWidth = font.widthOfTextAtSize(text, fontSize);
+      const w = page.getWidth();
+      const h = page.getHeight();
+
+      let x: number;
+      let y: number;
+      switch (opts.position) {
+        case 'top-left':
+          x = marginPt;
+          y = h - marginPt - fontSize;
+          break;
+        case 'top-right':
+          x = w - marginPt - textWidth;
+          y = h - marginPt - fontSize;
+          break;
+        case 'bottom-left':
+          x = marginPt;
+          y = marginPt;
+          break;
+        case 'bottom-center':
+          x = (w - textWidth) / 2;
+          y = marginPt;
+          break;
+        case 'bottom-right':
+          x = w - marginPt - textWidth;
+          y = marginPt;
+          break;
+        default:
+          x = w - marginPt - textWidth;
+          y = marginPt;
+      }
+
+      page.drawText(text, {
+        x,
+        y,
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
+
+    const bytes = await doc.save();
+    return Buffer.from(bytes);
   }
 
   /** PDF → 이미지 ZIP (Ghostscript + jszip) */

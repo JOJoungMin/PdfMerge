@@ -136,10 +136,10 @@ export default function PdfMergeWidget() {
     );
   }
 
-  /* 파일 업로드 후: 사이드바 + 중앙 그리드 */
+  /* 파일 업로드 후: 사이드바(nav 아래 고정) + 중앙 그리드 */
   return (
     <div className="flex w-full min-h-screen">
-      <aside className="relative z-50 w-64 shrink-0 flex flex-col border-r border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm">
+      <aside className="fixed top-16 left-0 bottom-0 w-80 z-40 flex flex-col border-r border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm" aria-label="기능 컨트롤">
         <div className="p-4 border-b border-gray-100 dark:border-gray-700">
           <h1 className="text-lg font-bold text-gray-800 dark:text-white">PDF 병합기</h1>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">여러 PDF를 하나로</p>
@@ -192,7 +192,7 @@ export default function PdfMergeWidget() {
         </div>
       </aside>
 
-      <main className="flex-1 min-h-0 p-6 overflow-auto bg-gray-50 dark:bg-gray-900/50">
+      <main className="flex-1 min-h-0 p-6 overflow-auto bg-gray-50 dark:bg-gray-900/50 ml-80">
         <input
           id="file-upload"
           type="file"

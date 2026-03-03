@@ -8,8 +8,10 @@ interface RotateState {
   isRotating: boolean;
   error: string | null;
   angle: RotateAngle;
+  pageIndex: number;
   setFile: (file: File | null) => void;
   setAngle: (angle: RotateAngle) => void;
+  setPageIndex: (pageIndex: number) => void;
   rotateAndGetBlob: () => Promise<Blob | null>;
   reset: () => void;
 }
@@ -19,15 +21,17 @@ const initialState = {
   isRotating: false,
   error: null as string | null,
   angle: null as RotateAngle,
+  pageIndex: 0,
 };
 
 export const useRotateStore = create<RotateState>((set, get) => ({
   ...initialState,
-  setFile: (file) => set({ file, error: null }),
+  setFile: (file) => set({ file, error: null, pageIndex: 0 }),
   setAngle: (angle) => set({ angle }),
+  setPageIndex: (pageIndex) => set({ pageIndex }),
 
   rotateAndGetBlob: async () => {
-    const { file, angle } = get();
+    const { file, angle, pageIndex } = get();
     if (!file) return null;
 
     set({ isRotating: true, error: null });
@@ -45,6 +49,7 @@ export const useRotateStore = create<RotateState>((set, get) => ({
     const formData = new FormData();
     formData.append("file", file);
     formData.append("angle", angle.toString());
+    if (pageIndex >= 0) formData.append("pageIndex", String(pageIndex));
     formData.append("githubVersion", process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || "local");
 
     try {

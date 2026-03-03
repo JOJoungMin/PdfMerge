@@ -119,4 +119,30 @@ test.describe('다운로드 파일 유지 확인 (사이드바 전달)', () => {
     await expect(page).toHaveURL('/merge');
     await expect(page.getByText(/파일 \(1개\)/)).toBeVisible({ timeout: 5000 });
   });
+
+  test('페이지 번호 넣기 → 사이드바로 압축 이동 → 전달된 파일 확인', async ({ page }) => {
+    await page.goto('/page-number');
+    await page.locator('input#file-upload').setInputFiles(SAMPLE_PDF);
+    await page.waitForTimeout(800);
+    await page.getByRole('button', { name: /페이지 번호 추가/ }).click();
+
+    await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
+    await page.getByRole('button', { name: 'PDF 압축' }).click();
+
+    await expect(page).toHaveURL('/compress');
+    await expect(page.getByRole('button', { name: '파일 변경' })).toBeVisible({ timeout: 5000 });
+  });
+
+  test('페이지 번호 넣기 → 사이드바로 회전 이동 → 전달된 파일 확인', async ({ page }) => {
+    await page.goto('/page-number');
+    await page.locator('input#file-upload').setInputFiles(SAMPLE_PDF);
+    await page.waitForTimeout(800);
+    await page.getByRole('button', { name: /페이지 번호 추가/ }).click();
+
+    await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
+    await page.getByRole('button', { name: 'PDF 회전' }).click();
+
+    await expect(page).toHaveURL('/rotate');
+    await expect(page.getByText(/numbered/).first()).toBeVisible({ timeout: 5000 });
+  });
 });

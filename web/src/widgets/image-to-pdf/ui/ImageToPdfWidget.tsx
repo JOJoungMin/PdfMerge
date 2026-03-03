@@ -110,7 +110,7 @@ export default function ImageToPdfWidget() {
 
   return (
     <div className="flex w-full min-h-screen">
-      <aside className="relative z-50 w-64 shrink-0 flex flex-col border-r border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm">
+      <aside className="fixed top-16 left-0 bottom-0 w-80 z-40 flex flex-col border-r border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm" aria-label="기능 컨트롤">
         <div className="p-4 border-b border-gray-100 dark:border-gray-700">
           <h1 className="text-lg font-bold text-gray-800 dark:text-white">이미지 PDF 변환</h1>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">1장 = 1페이지 PDF, 여러 장은 ZIP으로</p>
@@ -148,7 +148,7 @@ export default function ImageToPdfWidget() {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col items-center justify-center min-h-0 p-6 overflow-auto bg-gray-50 dark:bg-gray-900/50">
+      <main className="flex-1 flex flex-col items-center justify-center min-h-0 p-6 overflow-auto bg-gray-50 dark:bg-gray-900/50 ml-80">
         <input id="file-upload" type="file" accept={ACCEPT} multiple ref={fileInputRef} className="hidden" onChange={onFileChange} />
         <div className="flex flex-wrap gap-4 justify-center">
           {previewUrls.map((url, i) => (

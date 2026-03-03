@@ -6,6 +6,7 @@ import { useConvertStore } from '@/features/pdf-convert/model/useConvertStore';
 import { useRotateStore } from '@/features/pdf-rotate/model/useRotateStore';
 import { useEditorStore } from '@/features/pdf-edit/model/useEditorStore';
 import { useImageToPdfStore } from '@/features/image-to-pdf/model/useImageToPdfStore';
+import { usePageNumberStore } from '@/features/pdf-page-number/model/usePageNumberStore';
 
 export default function DownloadLoadingOverlay() {
   const isMerging = useMergeStore((s) => s.isMerging);
@@ -14,29 +15,30 @@ export default function DownloadLoadingOverlay() {
   const isRotating = useRotateStore((s) => s.isRotating);
   const isProcessing = useEditorStore((s) => s.isProcessing);
   const isImageToPdfConverting = useImageToPdfStore((s) => s.isConverting);
+  const isPageNumberAdding = usePageNumberStore((s) => s.isAdding);
 
-  const isLoading = isMerging || isCompressing || isConverting || isRotating || isProcessing || isImageToPdfConverting;
+  const isLoading = isMerging || isCompressing || isConverting || isRotating || isProcessing || isImageToPdfConverting || isPageNumberAdding;
   if (!isLoading) return null;
 
   return (
     <>
-      {/* 네비바(4rem) 아래, 좌측 사이드바(16rem) 오른쪽 영역만 덮음 - nav와 aside는 제외 */}
+      {/* 네비바(4rem) 아래, 좌측 컨트롤 사이드바(w-80 = 20rem) 오른쪽 영역만 덮음 */}
       <div
         className="fixed z-40 backdrop-blur-sm bg-black/20 dark:bg-black/30"
         style={{
           top: '4rem',
-          left: '16rem',
+          left: '20rem',
           right: 0,
           bottom: 0,
         }}
         aria-hidden="true"
       />
-      {/* 로딩 스피너 - 화면 중앙 (덮는 영역 기준) */}
+      {/* 로딩 스피너 - 덮는 영역 중앙 */}
       <div
         className="fixed z-50 flex items-center justify-center"
         style={{
           top: '4rem',
-          left: '16rem',
+          left: '20rem',
           right: 0,
           bottom: 0,
           pointerEvents: 'none',

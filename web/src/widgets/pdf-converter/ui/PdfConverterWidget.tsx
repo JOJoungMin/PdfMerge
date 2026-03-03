@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Upload, File as FileIcon } from 'lucide-react';
+import { Upload, File as FileIcon, FileUp } from 'lucide-react';
 import { DownloadBtn } from '@/shared/ui/DownloadBtn';
 import { useConvertStore } from '@/features/pdf-convert/model/useConvertStore';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
@@ -16,6 +16,7 @@ const PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(
 export default function PdfConverterWidget() {
   const { file, isConverting, error, targetFormat, setFile, setTargetFormat, convertAndGetBlob, reset } = useConvertStore();
   const [previews, setPreviews] = useState<{ [fileName: string]: string }>({});
+  const [showReplacePopover, setShowReplacePopover] = useState(false);
   const { showSidebar } = useTransferSidebarStore();
   const { canDownload } = useDownloadLimitStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,9 +51,15 @@ export default function PdfConverterWidget() {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const f = e.target.files?.[0];
       if (f?.type === 'application/pdf') applyFile(f);
+      e.target.value = '';
     },
     [applyFile]
   );
+
+  const openReplaceFilePicker = () => {
+    setShowReplacePopover(false);
+    fileInputRef.current?.click();
+  };
 
   const handleFileSelect = useCallback(
     (fileList: FileList | null) => {
@@ -129,10 +136,10 @@ export default function PdfConverterWidget() {
     );
   }
 
-  /* 파일 업로드 후: 사이드바 + 중앙 미리보기 */
+  /* 파일 업로드 후: 사이드바(nav 아래 고정) + 중앙 미리보기 */
   return (
     <div className="flex w-full min-h-screen">
-      <aside className="relative z-50 w-64 shrink-0 flex flex-col border-r border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm">
+      <aside className="fixed top-16 left-0 bottom-0 w-80 z-40 flex flex-col border-r border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm" aria-label="기능 컨트롤">
         <div className="p-4 border-b border-gray-100 dark:border-gray-700">
           <h1 className="text-lg font-bold text-gray-800 dark:text-white">PDF 변환</h1>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">PDF → PNG, JPG</p>
@@ -180,7 +187,19 @@ export default function PdfConverterWidget() {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col items-center justify-center min-h-0 p-6 overflow-auto bg-gray-50 dark:bg-gray-900/50">
+      <main className="flex-1 flex flex-col items-center justify-center min-h-0 p-6 overflow-auto bg-gray-50 dark:bg-gray-900/50 ml-80 relative">
+        <div className="absolute top-4 left-4 z-10" onMouseEnter={() => setShowReplacePopover(true)} onMouseLeave={() => setShowReplacePopover(false)}>
+          <div className="w-12 h-12 rounded-lg bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-600 shadow flex items-center justify-center cursor-pointer hover:bg-white dark:hover:bg-gray-700">
+            <FileUp className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+          </div>
+          {showReplacePopover && (
+            <div className="absolute top-full left-0 mt-1 p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-lg whitespace-nowrap">
+              <button type="button" onClick={openReplaceFilePicker} className="block w-full text-left px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded">
+                파일 교체하기
+              </button>
+            </div>
+          )}
+        </div>
         <div className="flex flex-col items-center w-full max-w-4xl">
           <div className="flex items-center justify-center min-h-[300px] w-full">
             <img
@@ -193,6 +212,7 @@ export default function PdfConverterWidget() {
             {file.name}
           </p>
         </div>
+        <input type="file" accept=".pdf" ref={fileInputRef} className="hidden" onChange={onFileChange} aria-hidden />
       </main>
     </div>
   );

@@ -5,6 +5,12 @@ const SAMPLE_PDF = path.join(__dirname, 'fixtures', 'sample.pdf');
 const SAMPLE_PNG = path.join(__dirname, 'fixtures', 'sample.png');
 
 test.describe('각 페이지 다운로드 및 기능 확인', () => {
+  test('병합: 파일 1개만 있을 때 병합하기 버튼 비활성화', async ({ page }) => {
+    await page.goto('/merge');
+    await page.locator('input[type="file"]').setInputFiles(SAMPLE_PDF);
+    await expect(page.getByRole('button', { name: /병합하기/ })).toBeDisabled();
+  });
+
   test('병합: 파일 2개 업로드 → 병합 → 사이드바 → 다운로드 버튼 클릭', async ({ page }) => {
     const downloadPromise = page.waitForEvent('download');
 
@@ -22,6 +28,12 @@ test.describe('각 페이지 다운로드 및 기능 확인', () => {
 
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/merged.*\.pdf/);
+  });
+
+  test('압축: 파일 없을 때는 업로드 화면만 표시 (압축하기 버튼 없음)', async ({ page }) => {
+    await page.goto('/compress');
+    await expect(page.locator('h1')).toContainText('PDF 압축');
+    await expect(page.getByRole('button', { name: /압축하기/ })).not.toBeVisible();
   });
 
   test('압축: 파일 업로드 → 압축 → 사이드바 → 다운로드 버튼 클릭', async ({ page }) => {
@@ -56,13 +68,15 @@ test.describe('각 페이지 다운로드 및 기능 확인', () => {
     expect(download.suggestedFilename()).toMatch(/converted.*\.zip/);
   });
 
-  test('회전: 파일 업로드 → 회전 → 사이드바 → 다운로드 버튼 클릭', async ({ page }) => {
+  test('회전: 파일 업로드 → 90° 선택 → 회전 → 사이드바 → 다운로드 버튼 클릭', async ({ page }) => {
     const downloadPromise = page.waitForEvent('download');
 
     await page.goto('/rotate');
     await expect(page.locator('h1')).toContainText('PDF 회전');
 
     await page.locator('input#file-upload').setInputFiles(SAMPLE_PDF);
+    await page.waitForTimeout(500);
+    await page.getByRole('button', { name: '90°' }).click();
     await page.getByRole('button', { name: /회전하기/ }).click();
 
     await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
@@ -70,6 +84,12 @@ test.describe('각 페이지 다운로드 및 기능 확인', () => {
 
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/rotated.*\.pdf/);
+  });
+
+  test('회전: 파일 없을 때 회전하기 버튼 비활성화 (업로드 화면에서는 버튼 없음)', async ({ page }) => {
+    await page.goto('/rotate');
+    await expect(page.locator('h1')).toContainText('PDF 회전');
+    await expect(page.getByRole('button', { name: /회전하기/ })).not.toBeVisible();
   });
 
   test('편집: 파일 업로드 → PDF 생성 → 사이드바 → 다운로드 버튼 클릭', async ({ page }) => {
@@ -104,5 +124,30 @@ test.describe('각 페이지 다운로드 및 기능 확인', () => {
 
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.pdf$/);
+  });
+
+  test('페이지 번호 넣기: 파일 없을 때는 업로드 화면만 표시', async ({ page }) => {
+    await page.goto('/page-number');
+    await expect(page.locator('h1')).toContainText('페이지 번호 넣기');
+    await expect(page.getByRole('button', { name: /페이지 번호 추가/ })).not.toBeVisible();
+  });
+
+  test('페이지 번호 넣기: PDF 업로드 → 위치(하단 중앙) 선택 → 페이지 번호 추가 → 사이드바 → 다운로드', async ({ page }) => {
+    const downloadPromise = page.waitForEvent('download');
+
+    await page.goto('/page-number');
+    await expect(page.locator('h1')).toContainText('페이지 번호 넣기');
+
+    await page.locator('input#file-upload').setInputFiles(SAMPLE_PDF);
+    await page.waitForTimeout(800);
+    await page.getByRole('button', { name: /하단 중앙/ }).click();
+
+    await page.getByRole('button', { name: /페이지 번호 추가/ }).click();
+
+    await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
+    await page.getByRole('button', { name: /다운로드/ }).click();
+
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/numbered.*\.pdf/);
   });
 });

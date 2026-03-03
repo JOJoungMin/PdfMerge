@@ -103,6 +103,7 @@ export class PdfController {
   async rotate(
     @UploadedFile() file: Express.Multer.File,
     @Body('angle') angleStr?: string,
+    @Body('pageIndex') pageIndexStr?: string,
   ) {
     this.logger.log('pdf-rotate 요청 받음');
     if (!file) {
@@ -112,8 +113,56 @@ export class PdfController {
     if (![90, 180, 270].includes(angle)) {
       throw new BadRequestException('회전 각도는 90, 180, 270 중 하나여야 합니다.');
     }
-    const buffer = await this.pdfService.rotate(file, angle as 90 | 180 | 270);
+    const pageIndex = pageIndexStr !== undefined && pageIndexStr !== '' ? parseInt(pageIndexStr, 10) : undefined;
+    const buffer = await this.pdfService.rotate(file, angle as 90 | 180 | 270, pageIndex);
     const filename = `rotated-${file.originalname || 'document.pdf'}`;
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    });
+  }
+
+  @Post('pdf-page-number')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
+  async addPageNumber(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('position') position?: string,
+    @Body('margin') margin?: string,
+    @Body('startPage') startPageStr?: string,
+    @Body('endPage') endPageStr?: string,
+    @Body('startNumber') startNumberStr?: string,
+    @Body('textFormat') textFormat?: string,
+    @Body('padding') paddingStr?: string,
+  ) {
+    this.logger.log('pdf-page-number 요청 받음');
+    if (!file) {
+      throw new BadRequestException('PDF 파일이 필요합니다.');
+    }
+    const positions = ['top-left', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right'] as const;
+    const margins = ['narrow', 'medium', 'wide'] as const;
+    const formats = ['number-only', 'n-of-total'] as const;
+    const paddings = [1, 2, 3] as const;
+
+    const pos = positions.includes(position as any) ? (position as (typeof positions)[number]) : 'bottom-center';
+    const marg = margins.includes(margin as any) ? (margin as (typeof margins)[number]) : 'medium';
+    const fmt = formats.includes(textFormat as any) ? (textFormat as (typeof formats)[number]) : 'number-only';
+    const pad = paddings.includes(Number(paddingStr) as 1 | 2 | 3) ? (Number(paddingStr) as 1 | 2 | 3) : 1;
+
+    const startPage = Math.max(1, parseInt(startPageStr ?? '1', 10) || 1);
+    const endPage = Math.max(1, parseInt(endPageStr ?? '1', 10) || 1);
+    const startNumber = Math.max(1, parseInt(startNumberStr ?? '1', 10) || 1);
+
+    const buffer = await this.pdfService.addPageNumbers(file, {
+      position: pos,
+      margin: marg,
+      startPage,
+      endPage,
+      startNumber,
+      textFormat: fmt,
+      padding: pad,
+    });
+    const baseName = (file.originalname || 'document').replace(/\.pdf$/i, '');
+    const filename = `numbered-${baseName}.pdf`;
     return new StreamableFile(buffer, {
       type: 'application/pdf',
       disposition: `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
