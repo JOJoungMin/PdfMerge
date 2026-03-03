@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FileJson, Scissors, Minimize, RefreshCw, RotateCw } from 'lucide-react';
+import { FileJson, Scissors, Minimize, RefreshCw, RotateCw, ImageIcon } from 'lucide-react';
 
 const tools = [
   { name: 'PDF 병합', description: '여러 개의 PDF 파일을 하나로 합칩니다.', href: '/merge', icon: FileJson, bgColor: 'bg-blue-500' },
@@ -7,6 +7,7 @@ const tools = [
   { name: 'PDF 압축', description: 'PDF 파일의 크기를 줄입니다.', href: '/compress', icon: Minimize, bgColor: 'bg-yellow-500' },
   { name: 'PDF 변환', description: 'PDF를 다른 포맷으로 변환합니다.', href: '/convert', icon: RefreshCw, bgColor: 'bg-red-500' },
   { name: 'PDF 회전', description: 'PDF 페이지를 90°, 180°, 270°로 회전합니다.', href: '/rotate', icon: RotateCw, bgColor: 'bg-indigo-500' },
+  { name: '이미지 PDF 변환', description: 'JPG, PNG 이미지 1장을 PDF 1개로 변환합니다.', href: '/image-to-pdf', icon: ImageIcon, bgColor: 'bg-teal-500' },
 ];
 
 export function MainMenuWidget() {

@@ -5,6 +5,7 @@ import { useCompressStore } from '@/features/pdf-compress/model/useCompressStore
 import { useConvertStore } from '@/features/pdf-convert/model/useConvertStore';
 import { useRotateStore } from '@/features/pdf-rotate/model/useRotateStore';
 import { useEditorStore } from '@/features/pdf-edit/model/useEditorStore';
+import { useImageToPdfStore } from '@/features/image-to-pdf/model/useImageToPdfStore';
 
 export default function DownloadLoadingOverlay() {
   const isMerging = useMergeStore((s) => s.isMerging);
@@ -12,8 +13,9 @@ export default function DownloadLoadingOverlay() {
   const isConverting = useConvertStore((s) => s.isConverting);
   const isRotating = useRotateStore((s) => s.isRotating);
   const isProcessing = useEditorStore((s) => s.isProcessing);
+  const isImageToPdfConverting = useImageToPdfStore((s) => s.isConverting);
 
-  const isLoading = isMerging || isCompressing || isConverting || isRotating || isProcessing;
+  const isLoading = isMerging || isCompressing || isConverting || isRotating || isProcessing || isImageToPdfConverting;
   if (!isLoading) return null;
 
   return (

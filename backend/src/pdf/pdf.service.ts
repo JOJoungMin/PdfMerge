@@ -129,6 +129,40 @@ export class PdfService {
     return Buffer.from(bytes);
   }
 
+  /** 이미지 1장 → 1페이지 PDF. 여러 장이면 PDF 여러 개를 ZIP으로 반환 */
+  async imagesToPdf(files: Express.Multer.File[]): Promise<{ buffer: Buffer; contentType: 'application/pdf' | 'application/zip'; filename: string }> {
+    if (!files?.length) throw new Error('이미지 파일이 1개 이상 필요합니다.');
+    const pdfBuffers: { buffer: Buffer; name: string }[] = [];
+    for (const file of files) {
+      const mime = file.mimetype?.toLowerCase() || '';
+      const buffer = file.buffer;
+      const doc = await PDFDocument.create();
+      const img = mime === 'image/jpeg' || mime === 'image/jpg'
+        ? await doc.embedJpg(buffer)
+        : await doc.embedPng(buffer);
+      const page = doc.addPage([img.width, img.height]);
+      page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+      const bytes = await doc.save();
+      const baseName = (file.originalname || 'image').replace(/\.(jpe?g|png)$/i, '');
+      pdfBuffers.push({ buffer: Buffer.from(bytes), name: `${baseName}.pdf` });
+    }
+    if (pdfBuffers.length === 1) {
+      return {
+        buffer: pdfBuffers[0].buffer,
+        contentType: 'application/pdf',
+        filename: pdfBuffers[0].name,
+      };
+    }
+    const zip = new JSZip();
+    pdfBuffers.forEach((p, i) => zip.file(p.name, p.buffer));
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    return {
+      buffer: zipBuffer,
+      contentType: 'application/zip',
+      filename: 'images-to-pdf.zip',
+    };
+  }
+
   /** PDF → 이미지 ZIP (Ghostscript + jszip) */
   async convert(file: Express.Multer.File, targetFormat: string): Promise<Buffer> {
     if (!file) throw new Error('변환할 파일이 필요합니다.');

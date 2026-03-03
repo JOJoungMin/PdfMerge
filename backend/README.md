@@ -55,3 +55,7 @@ macOS: `brew install ghostscript poppler`
 Linux: `apt install ghostscript poppler-utils` 등
 
 이미지 미리보기/압축/변환 없이 **병합·편집만** 쓰려면 `gs`/`pdfinfo` 없이도 동작합니다.
+
+금일 일감 정리 
+
+페이지 구성 정리. , 기능 추가, 

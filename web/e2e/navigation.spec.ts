@@ -41,6 +41,13 @@ test.describe('페이지 이동', () => {
     await expect(page).toHaveURL('/rotate');
     await expect(page.locator('h1')).toContainText('PDF 회전');
 
+    // 이미지 PDF 변환 페이지로
+    await page.getByRole('link', { name: 'PDF-Utils' }).first().click();
+    await expect(page).toHaveURL('/');
+    await page.getByRole('link', { name: /이미지 PDF 변환/ }).first().click();
+    await expect(page).toHaveURL('/image-to-pdf');
+    await expect(page.locator('h1')).toContainText('이미지 PDF 변환');
+
     // 메인으로 복귀
     await page.getByRole('link', { name: 'PDF-Utils' }).first().click();
     await expect(page).toHaveURL('/');

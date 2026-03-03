@@ -120,6 +120,27 @@ export class PdfController {
     });
   }
 
+  @Post('image-to-pdf')
+  @UseInterceptors(
+    FilesInterceptor('files', 20, { limits: { fileSize: 20 * 1024 * 1024 } }),
+  )
+  async imageToPdf(@UploadedFiles() files: Express.Multer.File[]) {
+    this.logger.log('image-to-pdf 요청 받음');
+    if (!files?.length) {
+      throw new BadRequestException('이미지 파일이 1개 이상 필요합니다.');
+    }
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png'];
+    const invalid = files.find((f) => !f.mimetype || !allowed.includes(f.mimetype.toLowerCase()));
+    if (invalid) {
+      throw new BadRequestException('JPG, PNG 이미지만 지원합니다.');
+    }
+    const result = await this.pdfService.imagesToPdf(files);
+    return new StreamableFile(result.buffer, {
+      type: result.contentType,
+      disposition: `attachment; filename*=UTF-8''${encodeURIComponent(result.filename)}`,
+    });
+  }
+
   @Post('pdf-convert')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
   async convert(

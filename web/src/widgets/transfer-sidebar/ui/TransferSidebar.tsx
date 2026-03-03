@@ -4,7 +4,7 @@ import { useEffect, useCallback } from 'react';
 import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
 import { useRouter } from 'next/navigation';
-import { X, FileUp, Shrink, ArrowRightLeft, Edit, RotateCw, Download } from 'lucide-react';
+import { X, FileUp, Shrink, ArrowRightLeft, Edit, RotateCw, Download, ImageIcon } from 'lucide-react';
 import { downloadBlob } from '@/shared/lib/pdf/downloadBlob';
 
 export default function TransferSidebar() {
@@ -93,6 +93,10 @@ export default function TransferSidebar() {
         <button onClick={() => handleTransfer('/rotate')} className="flex items-center justify-center p-3 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 transition-colors">
           <RotateCw size={20} className="mr-2" />
           <span>PDF 회전</span>
+        </button>
+        <button onClick={() => handleTransfer('/image-to-pdf')} className="flex items-center justify-center p-3 rounded-md bg-teal-500 text-white hover:bg-teal-600 transition-colors">
+          <ImageIcon size={20} className="mr-2" />
+          <span>이미지 PDF 변환</span>
         </button>
       </div>
     </div>

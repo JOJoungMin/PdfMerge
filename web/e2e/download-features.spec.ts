@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 
 const SAMPLE_PDF = path.join(__dirname, 'fixtures', 'sample.pdf');
+const SAMPLE_PNG = path.join(__dirname, 'fixtures', 'sample.png');
 
 test.describe('각 페이지 다운로드 및 기능 확인', () => {
   test('병합: 파일 2개 업로드 → 병합 → 사이드바 → 다운로드 버튼 클릭', async ({ page }) => {
@@ -87,5 +88,21 @@ test.describe('각 페이지 다운로드 및 기능 확인', () => {
 
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/edited-document\.pdf/);
+  });
+
+  test('이미지 PDF 변환: 이미지 1장 업로드 → PDF로 만들기 → 사이드바 → 다운로드 버튼 클릭', async ({ page }) => {
+    const downloadPromise = page.waitForEvent('download');
+
+    await page.goto('/image-to-pdf');
+    await expect(page.locator('h1')).toContainText('이미지 PDF 변환');
+
+    await page.locator('input#file-upload').setInputFiles(SAMPLE_PNG);
+    await page.getByRole('button', { name: /PDF로 만들기/ }).click();
+
+    await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
+    await page.getByRole('button', { name: /다운로드/ }).click();
+
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.pdf$/);
   });
 });

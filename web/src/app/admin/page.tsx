@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
 import { API_BASE_URL } from '@/shared/api/config';
-import { FileJson, RefreshCw, ArrowLeft, Filter } from 'lucide-react';
+import { FileJson, RefreshCw, Filter } from 'lucide-react';
 
 interface RequestLog {
   id: number;
@@ -96,13 +95,6 @@ export default function AdminPage() {
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              <span>돌아가기</span>
-            </Link>
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
               <FileJson className="h-7 w-7 text-blue-600" />
               관리자 - 요청 로그
