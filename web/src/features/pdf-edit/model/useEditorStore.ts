@@ -85,7 +85,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   editAndDownload: async () => {
     const { files, pages } = get();
-    if (pages.length === 0) return false;
+    if (pages.length === 0) return null;
 
     set({ isProcessing: true, error: null });
 
