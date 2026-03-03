@@ -14,7 +14,7 @@ test.describe('다운로드 파일 유지 확인 (사이드바 전달)', () => {
     await page.getByRole('button', { name: 'PDF 압축' }).click();
 
     await expect(page).toHaveURL('/compress');
-    await expect(page.getByText(/merged/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/merged/).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('압축 → 사이드바로 병합 이동 → 전달된 파일 확인', async ({ page }) => {
@@ -26,7 +26,7 @@ test.describe('다운로드 파일 유지 확인 (사이드바 전달)', () => {
     await page.getByRole('button', { name: 'PDF 병합' }).click();
 
     await expect(page).toHaveURL('/merge');
-    await expect(page.getByText(/compressed/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/compressed/).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('병합 → 압축 → 변환 순서로 전달하며 파일 유지 확인', async ({ page }) => {
@@ -37,13 +37,13 @@ test.describe('다운로드 파일 유지 확인 (사이드바 전달)', () => {
     await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
     await page.getByRole('button', { name: 'PDF 압축' }).click();
     await expect(page).toHaveURL('/compress');
-    await expect(page.getByText(/merged/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/merged/).first()).toBeVisible({ timeout: 5000 });
 
     await page.getByRole('button', { name: /압축하기/ }).click();
     await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
     await page.getByRole('button', { name: 'PDF 변환' }).click();
     await expect(page).toHaveURL('/convert');
-    await expect(page.getByText(/compressed/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/compressed/).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('압축 → 사이드바로 변환 이동 → 전달된 파일 확인', async ({ page }) => {
@@ -55,7 +55,7 @@ test.describe('다운로드 파일 유지 확인 (사이드바 전달)', () => {
     await page.getByRole('button', { name: 'PDF 변환' }).click();
 
     await expect(page).toHaveURL('/convert');
-    await expect(page.getByText(/compressed/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/compressed/).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('회전 → 사이드바로 편집 이동 → 전달된 파일 확인', async ({ page }) => {
@@ -67,7 +67,7 @@ test.describe('다운로드 파일 유지 확인 (사이드바 전달)', () => {
     await page.getByRole('button', { name: 'PDF 편집' }).click();
 
     await expect(page).toHaveURL('/editor');
-    await expect(page.getByText(/rotated/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/rotated/).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('편집 → 사이드바로 회전 이동 → 전달된 파일 확인', async ({ page }) => {
@@ -80,7 +80,7 @@ test.describe('다운로드 파일 유지 확인 (사이드바 전달)', () => {
     await page.getByRole('button', { name: 'PDF 회전' }).click();
 
     await expect(page).toHaveURL('/rotate');
-    await expect(page.getByText(/edited-document/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/edited-document/).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('회전 → 사이드바로 변환 이동 → 전달된 파일 확인', async ({ page }) => {
@@ -92,6 +92,6 @@ test.describe('다운로드 파일 유지 확인 (사이드바 전달)', () => {
     await page.getByRole('button', { name: 'PDF 변환' }).click();
 
     await expect(page).toHaveURL('/convert');
-    await expect(page.getByText(/rotated/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/rotated/).first()).toBeVisible({ timeout: 5000 });
   });
 });
