@@ -70,6 +70,7 @@ jobs:
             git fetch origin && git reset --hard origin/main && \
             aws ecr get-login-password --region ${AWS_REG} | docker login --username AWS --password-stdin ${ECR_REGISTRY} && \
             docker pull ${IMAGE} && \
+            docker image prune -f || true && \
             docker stop pdf-api 2>/dev/null || true && \
             docker rm pdf-api 2>/dev/null || true && \
             (for c in \$(docker ps -q --filter 'publish=3001'); do docker stop \$c; done) && \
