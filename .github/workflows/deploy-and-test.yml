@@ -73,17 +73,16 @@ jobs:
             docker image prune -f || true && \
             docker stop pdf-api 2>/dev/null || true && \
             docker rm pdf-api 2>/dev/null || true && \
-            (for c in \$(docker ps -q --filter 'publish=3001'); do docker stop \$c; done) && \
-            (for c in \$(docker ps -aq --filter 'publish=3001'); do docker rm \$c; done) && \
             (sudo fuser -k 3001/tcp 2>/dev/null || true) && \
             (pm2 delete backend 2>/dev/null || true) && pm2 save && \
             sleep 2 && \
-            docker run -d --name pdf-api -p 3001:3001 --restart unless-stopped \
-              -e DB_HOST='${DB_HOST}' \
-              -e DB_PORT='${DB_PORT}' \
-              -e DB_USERNAME='${DB_USERNAME}' \
-              -e DB_PASSWORD='${DB_PASSWORD}' \
-              -e DB_DATABASE='${DB_DATABASE}' \
+            docker run -d --name pdf-api --restart unless-stopped -p 3001:3001 \
+              -e PORT=3001 \
+              -e DB_HOST=${DB_HOST} \
+              -e DB_PORT=${DB_PORT} \
+              -e DB_USERNAME=${DB_USERNAME} \
+              -e DB_PASSWORD=${DB_PASSWORD} \
+              -e DB_DATABASE=${DB_DATABASE} \
               ${IMAGE} && \
             cd web && \
             npm ci && \

@@ -8,8 +8,9 @@ test.describe('버튼 및 UI 동작', () => {
     await page.goto('/compress');
     await page.locator('input#file-upload').setInputFiles(SAMPLE_PDF);
     await expect(page.locator('h1')).toContainText('PDF 압축');
+    await expect(page.getByRole('main').locator('img').first()).toBeVisible({ timeout: 15000 });
 
-    await page.getByRole('main').locator('div.absolute').first().hover();
+    await page.getByRole('main').locator('div.absolute.top-4.left-4').hover();
     await expect(page.getByRole('button', { name: '파일 교체하기' })).toBeVisible();
   });
 
@@ -17,8 +18,9 @@ test.describe('버튼 및 UI 동작', () => {
     await page.goto('/compress');
     await page.locator('input#file-upload').setInputFiles(SAMPLE_PDF);
     await expect(page).toHaveURL('/compress');
+    await expect(page.getByRole('main').locator('img').first()).toBeVisible({ timeout: 15000 });
 
-    await page.getByRole('main').locator('div.absolute').first().hover();
+    await page.getByRole('main').locator('div.absolute.top-4.left-4').hover();
     await page.getByRole('button', { name: '파일 교체하기' }).click();
     await page.locator('input[type="file"]').setInputFiles(SAMPLE_PDF);
     await expect(page).toHaveURL('/compress');
@@ -79,24 +81,57 @@ test.describe('버튼 및 UI 동작', () => {
     await expect(page.getByRole('button', { name: /다운로드/ })).toBeVisible();
   });
 
-  const TRANSFER_BUTTONS: { name: string; path: string }[] = [
-    { name: 'PDF 병합', path: '/merge' },
-    { name: 'PDF 압축', path: '/compress' },
-    { name: 'PDF 변환', path: '/convert' },
-    { name: 'PDF 편집', path: '/editor' },
-    { name: 'PDF 회전', path: '/rotate' },
-    { name: '이미지 PDF 변환', path: '/image-to-pdf' },
-    { name: '페이지 번호 넣기', path: '/page-number' },
+  test('전달 사이드바: 완료 카드에 "완료" 문구 및 다운로드 버튼 표시', async ({ page }) => {
+    await page.goto('/compress');
+    await page.locator('input#file-upload').setInputFiles(SAMPLE_PDF);
+    await page.getByRole('button', { name: /압축하기/ }).click();
+    await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
+    await expect(page.getByText('완료', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /다운로드/ })).toBeVisible();
+  });
+
+  test('전달 사이드바: "더 살펴보기" 클릭 시 PDF 편집 등 추가 버튼 표시', async ({ page }) => {
+    await page.goto('/compress');
+    await page.locator('input#file-upload').setInputFiles(SAMPLE_PDF);
+    await page.getByRole('button', { name: /압축하기/ }).click();
+    await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'PDF 편집' })).not.toBeVisible();
+    await page.getByRole('button', { name: '더 살펴보기' }).click();
+    await expect(page.getByRole('button', { name: 'PDF 편집' })).toBeVisible();
+  });
+
+  const TRANSFER_BUTTONS: { name: string; path: string; inMoreMenu: boolean }[] = [
+    { name: 'PDF 병합', path: '/merge', inMoreMenu: false },
+    // 현재 페이지(/compress)와 동일하여 사이드바 상단에는 노출되지 않으므로 E2E 대상에서 제외
+    // { name: 'PDF 압축', path: '/compress', inMoreMenu: false },
+    { name: 'PDF 변환', path: '/convert', inMoreMenu: false },
+    { name: 'PDF 편집', path: '/editor', inMoreMenu: true },
+    { name: 'PDF 회전', path: '/rotate', inMoreMenu: true },
+    { name: '이미지 PDF 변환', path: '/image-to-pdf', inMoreMenu: true },
+    { name: '페이지 번호 넣기', path: '/page-number', inMoreMenu: true },
+    { name: 'PDF 블라인드', path: '/redact', inMoreMenu: true },
   ];
 
-  for (const { name, path: targetPath } of TRANSFER_BUTTONS) {
+  for (const { name, path: targetPath, inMoreMenu } of TRANSFER_BUTTONS) {
     test(`전달 사이드바: "${name}" 버튼 클릭 시 ${targetPath}로 이동`, async ({ page }) => {
       await page.goto('/compress');
       await page.locator('input#file-upload').setInputFiles(SAMPLE_PDF);
       await page.getByRole('button', { name: /압축하기/ }).click();
-      await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
+      const panel = page
+        .locator('div')
+        .filter({ has: page.getByRole('heading', { name: '다른 기능 사용하기' }) })
+        .first();
+      await expect(panel).toBeVisible();
 
-      await page.getByRole('button', { name, exact: true }).click();
+      if (inMoreMenu) {
+        await panel.getByRole('button', { name: '더 살펴보기' }).click();
+        // 더 살펴보기 펼침 후 맨 아래 버튼(예: PDF 블라인드)이 뷰포트 밖에 있을 수 있으므로 스크롤 후 클릭
+        const btn = panel.getByRole('button', { name, exact: true });
+        await btn.scrollIntoViewIfNeeded();
+        await btn.click();
+      } else {
+        await panel.getByRole('button', { name, exact: true }).click();
+      }
       await expect(page).toHaveURL(targetPath);
     });
   }

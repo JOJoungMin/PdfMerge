@@ -5,7 +5,7 @@ import { X, Upload } from 'lucide-react';
 import type { MergedFile } from '@/features/pdf-merge/model/useMergeStore';
 
 const PLACEHOLDER_SVG = 'data:image/svg+xml,' + encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="400" viewBox="0 0 320 400"><rect fill="#e5e7eb" width="320" height="400"/><text x="160" y="200" text-anchor="middle" fill="#9ca3af" font-size="14">미리보기</text></svg>'
+  '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="400" viewBox="0 0 320 400"><rect fill="#e5e7eb" width="320" height="400"/><text x="160" y="200" text-anchor="middle" fill="#9ca3af" font-size="14">미리보기 준비 중</text></svg>'
 );
 
 interface PdfMergeGridProps {

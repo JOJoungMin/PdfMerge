@@ -12,6 +12,7 @@ build/
 # Env (절대 커밋 금지)
 .env
 .env.*
+deploy/.env
 .env*.local
 !.env.example
 
@@ -51,3 +52,12 @@ blob-report/
 
 # 면접 답변 정리 (로컬 확인용, Git 제외)
 interview-qa.md
+
+# Tesseract 언어 데이터 (바이너리/용량 큼)
+*.traineddata
+
+# 문서용 스크린샷/생성 이미지 (로컬 참고용)
+docs/output-*.png
+
+# 개인 이력서 등 (저장소 제외)
+docs/*.pdf

@@ -1,16 +1,37 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useTransferSidebarStore } from '@/shared/model/useTransferSidebarStore';
 import { useDownloadLimitStore } from '@/shared/model/useDownloadLimitStore';
-import { useRouter } from 'next/navigation';
-import { X, FileUp, Shrink, ArrowRightLeft, Edit, RotateCw, Download, ImageIcon, Hash } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
+import { X, FileUp, Shrink, ArrowRightLeft, Edit, RotateCw, Download, ImageIcon, Hash, Square, CheckCircle, ChevronDown } from 'lucide-react';
 import { downloadBlob } from '@/shared/lib/pdf/downloadBlob';
+import { formatSize } from '@/shared/lib/formatSize';
+
+const TRANSFER_ACTIONS: { path: string; label: string; icon: React.ReactNode; className: string }[] = [
+  { path: '/merge', label: 'PDF 병합', icon: <FileUp size={20} className="mr-2" />, className: 'bg-blue-500 hover:bg-blue-600' },
+  { path: '/compress', label: 'PDF 압축', icon: <Shrink size={20} className="mr-2" />, className: 'bg-green-500 hover:bg-green-600' },
+  { path: '/convert', label: 'PDF 변환', icon: <ArrowRightLeft size={20} className="mr-2" />, className: 'bg-purple-500 hover:bg-purple-600' },
+  { path: '/editor', label: 'PDF 편집', icon: <Edit size={20} className="mr-2" />, className: 'bg-yellow-500 hover:bg-yellow-600' },
+  { path: '/rotate', label: 'PDF 회전', icon: <RotateCw size={20} className="mr-2" />, className: 'bg-indigo-500 hover:bg-indigo-600' },
+  { path: '/image-to-pdf', label: '이미지 PDF 변환', icon: <ImageIcon size={20} className="mr-2" />, className: 'bg-teal-500 hover:bg-teal-600' },
+  { path: '/page-number', label: '페이지 번호 넣기', icon: <Hash size={20} className="mr-2" />, className: 'bg-slate-500 hover:bg-slate-600' },
+  { path: '/redact', label: 'PDF 블라인드', icon: <Square size={20} className="mr-2" />, className: 'bg-amber-600 hover:bg-amber-700' },
+];
+
+const DEFAULT_VISIBLE_PATHS = ['/merge', '/compress', '/convert'];
 
 export default function TransferSidebar() {
   const { isVisible, transferFile, transferSummary, closeInstantly, hideSidebar } = useTransferSidebarStore();
   const { canDownload, increment } = useDownloadLimitStore();
   const router = useRouter();
+  const pathname = usePathname();
+  const [showMoreActions, setShowMoreActions] = useState(false);
+
+  const defaultVisibleActions = TRANSFER_ACTIONS.filter(
+    (a) => DEFAULT_VISIBLE_PATHS.includes(a.path) && a.path !== pathname
+  );
+  const moreActions = TRANSFER_ACTIONS.filter((a) => !DEFAULT_VISIBLE_PATHS.includes(a.path));
 
   const handleDownload = useCallback(async () => {
     if (!transferFile || !canDownload()) return;
@@ -49,58 +70,75 @@ export default function TransferSidebar() {
 
       {transferFile && (
         <div className="mb-4">
-          {transferSummary && (
-            <div className="mb-3 p-3 rounded-lg bg-white/80 dark:bg-gray-800/80 border border-blue-100 dark:border-blue-900/50">
-              <p className="text-sm font-semibold text-gray-800 dark:text-white mb-1.5">{transferSummary.title}</p>
-              <ul className="text-xs text-gray-600 dark:text-gray-300 space-y-0.5">
-                {transferSummary.lines.map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
+          <div className="mb-4 p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-blue-100 dark:border-blue-900/50 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle className="w-8 h-8 text-green-500 shrink-0" aria-hidden />
+              <span className="text-lg font-bold text-gray-800 dark:text-white">완료</span>
             </div>
-          )}
-          <p className="mb-2 text-sm font-medium text-gray-800 dark:text-gray-200 truncate" title={transferFile.name}>
-            {transferFile.name}
-          </p>
-          <button
-            onClick={handleDownload}
-            disabled={!canDownload()}
-            className="w-full py-2.5 px-4 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-          >
-            <Download size={18} />
-            다운로드
-          </button>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate mb-0.5" title={transferFile.name}>
+              {transferFile.name}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              {formatSize(transferFile.size)}
+              {transferSummary?.lines?.[1] && ` · ${transferSummary.lines[1]}`}
+            </p>
+            <button
+              onClick={handleDownload}
+              disabled={!canDownload()}
+              className="w-full py-2.5 px-4 rounded-lg bg-blue-500 text-white font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            >
+              <Download size={18} />
+              다운로드
+            </button>
+            {transferSummary?.retry && (
+              <button
+                type="button"
+                onClick={() => transferSummary.retry!.onRetry()}
+                className="mt-2 w-full py-2 px-4 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                {transferSummary.retry.label}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
-      <div className="flex flex-col space-y-3">
-        <button onClick={() => handleTransfer('/merge')} className="flex items-center justify-center p-3 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors">
-          <FileUp size={20} className="mr-2" />
-          <span>PDF 병합</span>
-        </button>
-        <button onClick={() => handleTransfer('/compress')} className="flex items-center justify-center p-3 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors">
-          <Shrink size={20} className="mr-2" />
-          <span>PDF 압축</span>
-        </button>
-        <button onClick={() => handleTransfer('/convert')} className="flex items-center justify-center p-3 rounded-md bg-purple-500 text-white hover:bg-purple-600 transition-colors">
-          <ArrowRightLeft size={20} className="mr-2" />
-          <span>PDF 변환</span>
-        </button>
-        <button onClick={() => handleTransfer('/editor')} className="flex items-center justify-center p-3 rounded-md bg-yellow-500 text-white hover:bg-yellow-600 transition-colors">
-          <Edit size={20} className="mr-2" />
-          <span>PDF 편집</span>
-        </button>
-        <button onClick={() => handleTransfer('/rotate')} className="flex items-center justify-center p-3 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 transition-colors">
-          <RotateCw size={20} className="mr-2" />
-          <span>PDF 회전</span>
-        </button>
-        <button onClick={() => handleTransfer('/image-to-pdf')} className="flex items-center justify-center p-3 rounded-md bg-teal-500 text-white hover:bg-teal-600 transition-colors">
-          <ImageIcon size={20} className="mr-2" />
-          <span>이미지 PDF 변환</span>
-        </button>
-        <button onClick={() => handleTransfer('/page-number')} className="flex items-center justify-center p-3 rounded-md bg-slate-500 text-white hover:bg-slate-600 transition-colors">
-          <Hash size={20} className="mr-2" />
-          <span>페이지 번호 넣기</span>
+      <div className="flex flex-col space-y-2 flex-1 min-h-0 overflow-y-auto">
+        {defaultVisibleActions.length > 0 && (
+          <div className="flex flex-col space-y-2">
+            {defaultVisibleActions.map(({ path, label, icon, className }) => (
+              <button
+                key={path}
+                onClick={() => handleTransfer(path)}
+                className={`flex items-center justify-center p-3 rounded-md text-white transition-colors ${className}`}
+              >
+                {icon}
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {showMoreActions && (
+          <div className="flex flex-col space-y-2">
+            {moreActions.map(({ path, label, icon, className }) => (
+              <button
+                key={path}
+                onClick={() => handleTransfer(path)}
+                className={`flex items-center justify-center p-3 rounded-md text-white transition-colors ${className}`}
+              >
+                {icon}
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowMoreActions((v) => !v)}
+          className="flex items-center justify-center gap-2 py-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-white/60 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 font-medium hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors mt-2"
+        >
+          <span>{showMoreActions ? '접기' : '더 살펴보기'}</span>
+          <ChevronDown size={18} className={`transition-transform ${showMoreActions ? 'rotate-180' : ''}`} />
         </button>
       </div>
     </div>

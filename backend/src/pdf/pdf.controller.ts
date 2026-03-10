@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { PdfService } from './pdf.service';
+import type { UserRedactArea } from './pdf.service';
 
 @Controller()
 export class PdfController {
@@ -187,6 +188,51 @@ export class PdfController {
     return new StreamableFile(result.buffer, {
       type: result.contentType,
       disposition: `attachment; filename*=UTF-8''${encodeURIComponent(result.filename)}`,
+    });
+  }
+
+  @Post('pdf-redact')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
+  async redact(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('redactAreas') redactAreasStr?: string,
+  ) {
+    this.logger.log('pdf-redact 요청 받음');
+    if (!file) {
+      throw new BadRequestException('PDF 파일이 필요합니다.');
+    }
+    const styles: UserRedactArea['style'][] = ['black', 'blur', 'background'];
+    let areas: UserRedactArea[] = [];
+    if (redactAreasStr?.trim()) {
+      try {
+        const parsed = JSON.parse(redactAreasStr) as unknown[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          areas = parsed.map((a: any) => {
+            const rawStyle = typeof a.style === 'string' ? (a.style as string).toLowerCase().trim() : 'black';
+            const style: UserRedactArea['style'] = styles.includes(rawStyle as UserRedactArea['style']) ? (rawStyle as UserRedactArea['style']) : 'black';
+            return {
+              pageIndex: Number(a.pageIndex) ?? 0,
+              x: Number(a.x) ?? 0,
+              y: Number(a.y) ?? 0,
+              width: Number(a.width) ?? 0.1,
+              height: Number(a.height) ?? 0.1,
+              style,
+            };
+          });
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (!areas.length) {
+      throw new BadRequestException('가릴 영역(redactAreas)을 1개 이상 보내 주세요.');
+    }
+    const buffer = await this.pdfService.redactByAreas(file, areas);
+    const baseName = (file.originalname || 'document').replace(/\.pdf$/i, '');
+    const filename = `redacted-${baseName}.pdf`;
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
     });
   }
 

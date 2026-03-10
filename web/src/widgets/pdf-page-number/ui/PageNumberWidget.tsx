@@ -34,7 +34,7 @@ const PADDINGS: { value: PageNumberPadding; label: string }[] = [
 const PLACEHOLDER =
   'data:image/svg+xml,' +
   encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="176" viewBox="0 0 128 176"><rect fill="#e5e7eb" width="128" height="176"/></svg>'
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="400" viewBox="0 0 320 400"><rect fill="#e5e7eb" width="320" height="400"/><text x="160" y="200" text-anchor="middle" fill="#9ca3af" font-size="14">미리보기 준비 중</text></svg>'
   );
 
 /** 좁게=구석에 딱 맞춤(0), 보통/넓게=백엔드 20pt/28pt에 맞춰 썸네일 비율로 */
@@ -99,6 +99,8 @@ export default function PageNumberWidget() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => useDownloadLimitStore.getState().resetIfNeeded(), []);
+
+  useEffect(() => () => { reset(); }, [reset]);
 
   const fetchPreview = useCallback(async (f: File) => {
     const formData = new FormData();
@@ -190,6 +192,7 @@ export default function PageNumberWidget() {
   };
 
   const hasFile = !!file;
+  const isBuildingPreview = hasFile && previews.length === 0;
   const overlayStyle: CSSProperties | undefined = position ? getOverlayStyle(position, margin) : undefined;
 
   if (!hasFile) {
@@ -367,6 +370,17 @@ export default function PageNumberWidget() {
       </aside>
 
       <main className="flex-1 flex flex-col items-center justify-center min-h-0 p-6 overflow-auto bg-gray-50 dark:bg-gray-900/50 ml-80 relative">
+        {isBuildingPreview && (
+          <>
+            <div className="absolute inset-0 z-10 backdrop-blur-sm bg-black/20 dark:bg-black/30" aria-hidden />
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">PDF 빌드중</p>
+              </div>
+            </div>
+          </>
+        )}
         <div className="absolute top-4 left-4 z-10" onMouseEnter={() => setShowReplacePopover(true)} onMouseLeave={() => setShowReplacePopover(false)}>
           <div className="w-12 h-12 rounded-lg bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-600 shadow flex items-center justify-center cursor-pointer hover:bg-white dark:hover:bg-gray-700">
             <FileUp className="w-5 h-5 text-gray-600 dark:text-gray-300" />

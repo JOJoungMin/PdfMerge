@@ -7,6 +7,7 @@ import { useRotateStore } from '@/features/pdf-rotate/model/useRotateStore';
 import { useEditorStore } from '@/features/pdf-edit/model/useEditorStore';
 import { useImageToPdfStore } from '@/features/image-to-pdf/model/useImageToPdfStore';
 import { usePageNumberStore } from '@/features/pdf-page-number/model/usePageNumberStore';
+import { useRedactStore } from '@/features/pdf-redact/model/useRedactStore';
 
 export default function DownloadLoadingOverlay() {
   const isMerging = useMergeStore((s) => s.isMerging);
@@ -16,8 +17,9 @@ export default function DownloadLoadingOverlay() {
   const isProcessing = useEditorStore((s) => s.isProcessing);
   const isImageToPdfConverting = useImageToPdfStore((s) => s.isConverting);
   const isPageNumberAdding = usePageNumberStore((s) => s.isAdding);
+  const isRedacting = useRedactStore((s) => s.isRedacting);
 
-  const isLoading = isMerging || isCompressing || isConverting || isRotating || isProcessing || isImageToPdfConverting || isPageNumberAdding;
+  const isLoading = isMerging || isCompressing || isConverting || isRotating || isProcessing || isImageToPdfConverting || isPageNumberAdding || isRedacting;
   if (!isLoading) return null;
 
   return (

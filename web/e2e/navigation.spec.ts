@@ -8,6 +8,7 @@ const MAIN_CARDS: { label: string; name: string | RegExp; path: string; h1Text: 
   { label: 'PDF 회전', name: /PDF 회전/, path: '/rotate', h1Text: /PDF 회전/ },
   { label: '이미지 PDF 변환', name: /이미지 PDF 변환/, path: '/image-to-pdf', h1Text: /이미지 PDF 변환/ },
   { label: '페이지 번호 넣기', name: /페이지 번호 넣기/, path: '/page-number', h1Text: /페이지 번호 넣기/ },
+  { label: 'PDF 블라인드', name: /PDF 블라인드/, path: '/redact', h1Text: /PDF 블라인드/ },
 ];
 
 test.describe('페이지 이동', () => {

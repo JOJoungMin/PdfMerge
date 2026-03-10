@@ -5,7 +5,7 @@ import { X, UploadCloud } from 'lucide-react';
 import type { PageRepresentation } from '@/features/pdf-edit/model/useEditorStore';
 
 const PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300"><rect fill="#e5e7eb" width="200" height="300"/><text x="100" y="150" text-anchor="middle" fill="#9ca3af" font-size="12">Loading...</text></svg>'
+  '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300"><rect fill="#e5e7eb" width="200" height="300"/><text x="100" y="150" text-anchor="middle" fill="#9ca3af" font-size="12">미리보기 준비 중</text></svg>'
 );
 
 interface PdfEditorGridProps {

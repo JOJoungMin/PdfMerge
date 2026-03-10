@@ -65,6 +65,7 @@ test.describe('다운로드 파일 유지 확인 (사이드바 전달)', () => {
     await page.getByRole('button', { name: /회전하기/ }).click();
 
     await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
+    await page.getByRole('button', { name: '더 살펴보기' }).click();
     await page.getByRole('button', { name: 'PDF 편집' }).click();
 
     await expect(page).toHaveURL('/editor');
@@ -78,6 +79,7 @@ test.describe('다운로드 파일 유지 확인 (사이드바 전달)', () => {
     await page.getByRole('button', { name: /PDF 생성하기/ }).click();
 
     await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
+    await page.getByRole('button', { name: '더 살펴보기' }).click();
     await page.getByRole('button', { name: 'PDF 회전' }).click();
 
     await expect(page).toHaveURL('/rotate');
@@ -140,6 +142,7 @@ test.describe('다운로드 파일 유지 확인 (사이드바 전달)', () => {
     await page.getByRole('button', { name: /페이지 번호 추가/ }).click();
 
     await expect(page.getByRole('heading', { name: '다른 기능 사용하기' })).toBeVisible();
+    await page.getByRole('button', { name: '더 살펴보기' }).click();
     await page.getByRole('button', { name: 'PDF 회전' }).click();
 
     await expect(page).toHaveURL('/rotate');

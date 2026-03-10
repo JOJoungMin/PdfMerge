@@ -19,6 +19,8 @@ export default function ImageToPdfWidget() {
 
   useEffect(() => useDownloadLimitStore.getState().resetIfNeeded(), []);
 
+  useEffect(() => () => { reset(); }, [reset]);
+
   useEffect(() => {
     const urls = files.map((f) => URL.createObjectURL(f));
     setPreviewUrls((prev) => {

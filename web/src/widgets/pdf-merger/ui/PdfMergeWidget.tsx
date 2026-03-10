@@ -74,6 +74,8 @@ export default function PdfMergeWidget() {
     useDownloadLimitStore.getState().resetIfNeeded();
   }, []);
 
+  useEffect(() => () => { reset(); }, [reset]);
+
   useEffect(() => {
     const transferredFile = useTransferSidebarStore.getState().getAndClearTransferFile();
     if (transferredFile?.type === 'application/pdf') {

@@ -3,6 +3,8 @@ import { create } from 'zustand';
 export interface TransferSummary {
   title: string;
   lines: string[];
+  /** 예: 블라인드 적용 후 "다시 시도하기" → 이전 단계로 */
+  retry?: { label: string; onRetry: () => void };
 }
 
 interface TransferSidebarState {

@@ -7,6 +7,29 @@ import path from 'path';
 import os from 'os';
 import JSZip from 'jszip';
 
+/** 페이지별로 가릴 사각형 영역 (PDF 좌표, 원점 좌하단) */
+export interface RedactRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export interface PageRects {
+  pageIndex: number;
+  rects: RedactRect[];
+}
+
+/** 사용자 지정 가리기 영역. x,y,width,height는 비율(0~1, 원점 좌상단). */
+export type RedactAreaStyle = 'black' | 'blur' | 'background';
+export interface UserRedactArea {
+  pageIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  style: RedactAreaStyle;
+}
+
 const execPromise = promisify(exec);
 const execFilePromise = promisify(execFile);
 
@@ -277,5 +300,386 @@ export class PdfService {
     } finally {
       await fs.rm(tempDir, { recursive: true, force: true });
     }
+  }
+
+  /**
+   * 특정 문자열을 찾아 반투명 사각형으로 흐리게 가림 (블라인드).
+   * pdfjs-dist로 텍스트+좌표 추출 → pdf-lib로 사각형 그리기.
+   */
+  async redactByText(file: Express.Multer.File, searchString: string): Promise<Buffer> {
+    if (!file?.buffer) throw new Error('PDF 파일이 필요합니다.');
+    const search = searchString?.trim();
+    if (!search) throw new Error('가릴 문자열을 입력해 주세요.');
+
+    const pageRects = await this.findTextPositions(file.buffer, search);
+    if (pageRects.every((pr) => pr.rects.length === 0)) {
+      // 매칭 없으면 원본 반환
+      return Buffer.from(file.buffer);
+    }
+
+    const doc = await PDFDocument.load(file.buffer);
+    const pages = doc.getPages();
+
+    for (const { pageIndex, rects } of pageRects) {
+      if (pageIndex >= pages.length || !rects.length) continue;
+      const page = pages[pageIndex];
+      for (const r of rects) {
+        page.drawRectangle({
+          x: r.x,
+          y: r.y,
+          width: r.width,
+          height: r.height,
+          color: rgb(1, 1, 1),
+          opacity: 0.88,
+        });
+      }
+    }
+
+    const bytes = await doc.save();
+    return Buffer.from(bytes);
+  }
+
+  /** 사용자 지정 사각형 영역을 black / blur / background 스타일로 가리기. */
+  async redactByAreas(file: Express.Multer.File, areas: UserRedactArea[]): Promise<Buffer> {
+    if (!file?.buffer) throw new Error('PDF 파일이 필요합니다.');
+    if (!areas?.length) throw new Error('가릴 영역이 1개 이상 필요합니다.');
+
+    const doc = await PDFDocument.load(file.buffer);
+    const pages = doc.getPages();
+    const GS_DPI = 150;
+    const scale = GS_DPI / 72;
+    const sharp = (await import('sharp')).default;
+
+    const byPage = new Map<number, UserRedactArea[]>();
+    for (const a of areas) {
+      if (a.pageIndex < 0 || a.pageIndex >= pages.length) continue;
+      if (!byPage.has(a.pageIndex)) byPage.set(a.pageIndex, []);
+      byPage.get(a.pageIndex)!.push(a);
+    }
+
+    for (const [pageIndex, pageAreas] of byPage) {
+      const page = pages[pageIndex];
+      const pageWidth = page.getWidth();
+      const pageHeight = page.getHeight();
+      let pngBuffer: Buffer | null = null;
+
+      for (const area of pageAreas) {
+        const { x: xRatio, y: yRatio, width: wRatio, height: hRatio, style } = area;
+        const px = Math.max(0, Math.min(1, xRatio)) * pageWidth;
+        const py = (1 - Math.max(0, Math.min(1, yRatio + hRatio))) * pageHeight;
+        const pw = Math.max(1, Math.min(1, wRatio) * pageWidth);
+        const ph = Math.max(1, Math.min(1, hRatio) * pageHeight);
+
+        if (style === 'black') {
+          page.drawRectangle({
+            x: px,
+            y: py,
+            width: pw,
+            height: ph,
+            color: rgb(0, 0, 0),
+          });
+          continue;
+        }
+
+        if (style === 'blur' || style === 'background') {
+          if (!pngBuffer) pngBuffer = await this.renderPdfPageToPng(file.buffer, pageIndex + 1);
+          const left = Math.floor(px * scale);
+          const top = Math.floor((pageHeight - py - ph) * scale);
+          const imgW = Math.max(1, Math.floor(pw * scale));
+          const imgH = Math.max(1, Math.floor(ph * scale));
+          const meta = await sharp(pngBuffer).metadata();
+          const iw = meta.width ?? 0;
+          const ih = meta.height ?? 0;
+          const clampedLeft = Math.max(0, Math.min(left, iw - 1));
+          const clampedTop = Math.max(0, Math.min(top, ih - 1));
+          const clampedW = Math.max(1, Math.min(imgW, iw - clampedLeft));
+          const clampedH = Math.max(1, Math.min(imgH, ih - clampedTop));
+
+          if (style === 'blur') {
+            const blurred = await sharp(pngBuffer)
+              .extract({ left: clampedLeft, top: clampedTop, width: clampedW, height: clampedH })
+              .blur(35)
+              .png()
+              .toBuffer();
+            const embed = await doc.embedPng(blurred);
+            page.drawImage(embed, { x: px, y: py, width: pw, height: ph });
+          } else {
+            const { data: rawBuffer, info } = await sharp(pngBuffer)
+              .extract({ left: clampedLeft, top: clampedTop, width: clampedW, height: clampedH })
+              .raw()
+              .toBuffer({ resolveWithObject: true });
+            const channels = info.channels ?? 4;
+            const band = Math.max(1, Math.min(3, Math.floor(Math.min(clampedW, clampedH) * 0.25)));
+            let r = 0, g = 0, b = 0, n = 0;
+            const stride = clampedW * channels;
+            for (let row = 0; row < clampedH; row++) {
+              for (let col = 0; col < clampedW; col++) {
+                const isEdge = row < band || row >= clampedH - band || col < band || col >= clampedW - band;
+                if (!isEdge) continue;
+                const i = row * stride + col * channels;
+                r += rawBuffer[i];
+                g += rawBuffer[i + 1] ?? 0;
+                b += rawBuffer[i + 2] ?? 0;
+                n += 1;
+              }
+            }
+            if (n > 0) {
+              const R = r / n / 255;
+              const G = g / n / 255;
+              const B = b / n / 255;
+              page.drawRectangle({
+                x: px,
+                y: py,
+                width: pw,
+                height: ph,
+                color: rgb(R, G, B),
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const bytes = await doc.save();
+    return Buffer.from(bytes);
+  }
+
+  /** Poppler pdftotext 실행 경로. PATH 미반영 시 PDFTOTEXT_PATH 환경 변수로 전체 경로 지정 (예: C:\poppler-25.12.0\bin\pdftotext.exe) */
+  private getPdftotextCommand(): string {
+    const envPath = process.env.PDFTOTEXT_PATH;
+    if (envPath?.trim()) return envPath.trim();
+    return 'pdftotext';
+  }
+
+  /**
+   * Poppler pdftotext로 같은 PDF 텍스트 추출 → 콘솔 로그 (엔진 비교용).
+   * pdftotext 미설치 시 무시.
+   */
+  private async logPopplerExtract(pdfBuffer: Buffer): Promise<void> {
+    const tempDir = await fs.mkdtemp(path.join(this.tmpDir, 'pdf-poppler-'));
+    const inputPath = path.join(tempDir, 'input.pdf');
+    const pdftotextCmd = this.getPdftotextCommand();
+    try {
+      await fs.writeFile(inputPath, pdfBuffer);
+      const { stdout } = await execFilePromise(pdftotextCmd, [inputPath, '-'], { encoding: 'utf-8', maxBuffer: 2 * 1024 * 1024 });
+      const text = (stdout ?? '').trim();
+      // eslint-disable-next-line no-console
+      console.log('[pdf-redact] Poppler pdftotext 추출 텍스트 전체 (' + text.length + '자):\n' + (text || '(비어 있음)'));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.log('[pdf-redact] Poppler pdftotext 미사용 (미설치 또는 오류):', (e as Error).message);
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  /**
+   * Ghostscript으로 PDF 한 페이지를 PNG 이미지로 렌더 (OCR용).
+   * GS 미설치 시 예외.
+   */
+  private async renderPdfPageToPng(pdfBuffer: Buffer, pageNum: number): Promise<Buffer> {
+    const tempDir = await fs.mkdtemp(path.join(this.tmpDir, 'pdf-ocr-'));
+    const inputPath = path.join(tempDir, 'input.pdf');
+    const outputPath = path.join(tempDir, 'page.png');
+    try {
+      await fs.writeFile(inputPath, pdfBuffer);
+      const args = ['-dNOPAUSE', '-dBATCH', '-sDEVICE=pngalpha', `-dFirstPage=${pageNum}`, `-dLastPage=${pageNum}`, '-r150', `-sOutputFile=${outputPath}`, inputPath];
+      await execFilePromise(gsCommand, args);
+      return await fs.readFile(outputPath);
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  /**
+   * Tesseract.js OCR으로 이미지에서 텍스트 추출 (한글+영어).
+   * tesseract.js 설치 필요. 실패 시 빈 문자열 반환.
+   */
+  private async extractTextWithOcr(imageBuffer: Buffer): Promise<string> {
+    try {
+      const { createWorker } = await import('tesseract.js');
+      const worker = await createWorker('kor+eng');
+      const { data } = await worker.recognize(imageBuffer);
+      await worker.terminate();
+      return (data?.text ?? '').trim();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[pdf-redact] OCR(tesseract.js) 실패:', (e as Error).message);
+      return '';
+    }
+  }
+
+  /**
+   * OCR(tesseract.js)로 PDF 전체 페이지 텍스트 추출 후 콘솔에 출력.
+   * Ghostscript으로 페이지별 PNG 렌더 후 OCR. 블라인드 좌표는 사용하지 않음.
+   */
+  private async logOcrExtract(pdfBuffer: Buffer): Promise<void> {
+    let numPages = 1;
+    try {
+      const doc = await PDFDocument.load(pdfBuffer);
+      numPages = doc.getPageCount();
+    } catch {
+      numPages = 1;
+    }
+    // eslint-disable-next-line no-console
+    console.log('[pdf-redact] OCR 추출 시작 (페이지 수:', numPages, ')');
+    const parts: string[] = [];
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      try {
+        const pngBuffer = await this.renderPdfPageToPng(pdfBuffer, pageNum);
+        const text = await this.extractTextWithOcr(pngBuffer);
+        parts.push(text || '');
+        // eslint-disable-next-line no-console
+        console.log(`[pdf-redact] OCR 페이지 ${pageNum} (${text.length}자):`, text ? text.slice(0, 200) + (text.length > 200 ? '...' : '') : '(비어 있음)');
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn(`[pdf-redact] OCR 페이지 ${pageNum} 실패:`, (e as Error).message);
+        parts.push('');
+      }
+    }
+    const full = parts.join('\n\n').trim();
+    // eslint-disable-next-line no-console
+    console.log('[pdf-redact] OCR 추출 텍스트 전체 (' + full.length + '자):\n' + (full || '(비어 있음)'));
+  }
+
+  /**
+   * pdfjs-dist로 PDF에서 검색어 위치(페이지별 사각형 목록) 추출.
+   * 텍스트 출력은 OCR로 하고, 블라인드 좌표만 pdfjs 사용 (pdfjs 0자면 좌표 없음).
+   */
+  private async findTextPositions(pdfBuffer: Buffer, searchString: string): Promise<PageRects[]> {
+    await this.logOcrExtract(pdfBuffer);
+
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const opts = (pdfjsLib as any).GlobalWorkerOptions;
+    if (opts && !opts.workerSrc) {
+      try {
+        opts.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+      } catch {
+        opts.workerSrc = path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.mjs');
+      }
+    }
+
+    const data = new Uint8Array(pdfBuffer);
+    const loadingTask = (pdfjsLib as any).getDocument({
+      data,
+      useSystemFonts: true,
+      disableFontFace: true,
+      standardFontDataUrl: undefined,
+    });
+    const pdf = await loadingTask.promise;
+    const numPages = pdf.numPages;
+    const result: PageRects[] = [];
+
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const items = textContent?.items ?? [];
+      const rects = this.findSearchRects(items, searchString);
+      result.push({ pageIndex: pageNum - 1, rects });
+    }
+
+    return result;
+  }
+
+  /** 공백 접기 + NFC 정규화 (PDF 추출 텍스트와 검색어 매칭 보정) */
+  private normalizeForSearch(s: string): string {
+    return (s ?? '')
+      .normalize('NFC')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /** 정규화된 문자열에서 검색하고, 원본 fullText 상의 [start, end) 범위 반환 */
+  private normalizedSearch(
+    fullText: string,
+    searchString: string,
+  ): { origStart: number; origEnd: number }[] {
+    const normSearch = this.normalizeForSearch(searchString);
+    if (!normSearch) return [];
+
+    const fullNorm = fullText.normalize('NFC');
+    const normToFull: number[] = [];
+    let norm = '';
+    for (let i = 0; i < fullNorm.length; i++) {
+      const c = fullNorm[i];
+      const isSpace = /\s/.test(c);
+      if (isSpace && norm.length > 0 && /\s/.test(norm[norm.length - 1])) continue;
+      norm += c;
+      normToFull.push(i);
+    }
+
+    const hits: { origStart: number; origEnd: number }[] = [];
+    let idx = 0;
+    while (idx < norm.length) {
+      const found = norm.indexOf(normSearch, idx);
+      if (found < 0) break;
+      const endNorm = found + normSearch.length;
+      const origStart = normToFull[found] ?? 0;
+      const lastNormIdx = Math.min(endNorm - 1, normToFull.length - 1);
+      const origEnd = (normToFull[lastNormIdx] ?? 0) + 1;
+      hits.push({ origStart, origEnd });
+      idx = endNorm;
+    }
+    return hits;
+  }
+
+  private findSearchRects(
+    items: { str?: string; transform?: number[]; width?: number; height?: number }[],
+    searchString: string,
+  ): RedactRect[] {
+    const rects: RedactRect[] = [];
+    let fullText = '';
+    const itemRanges: { start: number; end: number; x: number; y: number; w: number; h: number }[] = [];
+
+    for (const it of items) {
+      const str = (it.str ?? '').toString();
+      const start = fullText.length;
+      fullText += str;
+      const end = fullText.length;
+      const t = it.transform;
+      const x = t && t[4] != null ? t[4] : 0;
+      const y = t && t[5] != null ? t[5] : 0;
+      let w = typeof it.width === 'number' ? it.width : 0;
+      let h = typeof it.height === 'number' ? it.height : 0;
+      if (h <= 0) h = 8;
+      if (w <= 0) w = 4;
+      itemRanges.push({ start, end, x, y, w, h });
+    }
+
+    const hits = this.normalizedSearch(fullText, searchString);
+    if (hits.length === 0) {
+      const direct = fullText.indexOf(searchString.trim());
+      if (direct >= 0) {
+        hits.push({ origStart: direct, origEnd: direct + searchString.trim().length });
+      }
+    }
+
+    for (const { origStart: found, origEnd: endFound } of hits) {
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (const r of itemRanges) {
+        if (r.end <= found || r.start >= endFound) continue;
+        minX = Math.min(minX, r.x);
+        minY = Math.min(minY, r.y);
+        maxX = Math.max(maxX, r.x + r.w);
+        maxY = Math.max(maxY, r.y + r.h);
+      }
+      if (minX !== Infinity && minY !== Infinity) {
+        let width = maxX - minX;
+        let height = maxY - minY;
+        if (height <= 0) height = 10;
+        if (width <= 0) width = 20;
+        rects.push({
+          x: minX,
+          y: minY,
+          width,
+          height,
+        });
+      }
+    }
+
+    return rects;
   }
 }

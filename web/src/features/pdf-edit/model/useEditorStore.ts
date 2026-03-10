@@ -38,28 +38,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addFiles: async (newFiles) => {
     const currentFiles = get().files;
     const newFileEntries: EditedFile[] = [];
-    const newPages: PageRepresentation[] = [];
 
     for (const file of newFiles) {
       if (currentFiles.some((ef) => ef.file.name === file.name)) continue;
-
       const newFileEntry: EditedFile = { id: `${file.name}-${Date.now()}-${Math.random()}`, file };
       newFileEntries.push(newFileEntry);
+    }
 
+    if (newFileEntries.length === 0) return;
+
+    set((state) => ({ files: [...state.files, ...newFileEntries], error: null }));
+
+    const newPages: PageRepresentation[] = [];
+    for (const { id, file } of newFileEntries) {
       const formData = new FormData();
       formData.append('file', file);
       try {
         const res = await fetch(`${API_BASE_URL}/api/pdf-preview`, { method: 'POST', body: formData });
         if (!res.ok) throw new Error('페이지 정보를 가져오는데 실패했습니다.');
         const { totalPages } = await res.json();
-
         for (let i = 0; i < totalPages; i++) {
-          newPages.push({
-            id: `${newFileEntry.id}-${i}`,
-            fileId: newFileEntry.id,
-            fileName: file.name,
-            pageIndex: i,
-          });
+          newPages.push({ id: `${id}-${i}`, fileId: id, fileName: file.name, pageIndex: i });
         }
       } catch {
         set({ error: '파일에서 페이지 정보를 읽어오는 데 실패했습니다.' });
@@ -67,11 +66,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
     }
 
-    set((state) => ({
-      files: [...state.files, ...newFileEntries],
-      pages: [...state.pages, ...newPages],
-      error: null,
-    }));
+    set((state) => ({ pages: [...state.pages, ...newPages] }));
   },
 
   removePage: (pageId) => set((state) => ({ pages: state.pages.filter((p) => p.id !== pageId) })),

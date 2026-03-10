@@ -54,6 +54,14 @@ Windows: Chocolatey `choco install ghostscript poppler`
 macOS: `brew install ghostscript poppler`  
 Linux: `apt install ghostscript poppler-utils` 등
 
+- **pdf-redact** (문자열 블라인드): 텍스트 추출 비교용으로 Poppler `pdftotext`를 사용할 수 있음.  
+  cmd에서는 `pdftotext`가 보이는데 Nest(IDE 터미널)에서만 못 찾을 때는 **PATH 대신 전체 경로**를 쓰면 됨.  
+  - 예: `PDFTOTEXT_PATH=C:\poppler-25.12.0\Library\bin\pdftotext.exe` (프로젝트 루트 `.env` 또는 터미널에서 설정)
+
+- **OCR (tesseract.js)**: pdfjs가 텍스트를 0자만 뽑을 때(폰트 오류 등) **이미지처럼 인식해 텍스트를 추출**하려면 OCR을 씁니다.  
+  - `npm install tesseract.js` 로 설치 후, pdf-redact 요청 시 pdfjs가 0자면 **Ghostscript로 1페이지를 PNG로 렌더 → Tesseract.js로 한글+영어 인식**해 콘솔에 로그합니다.  
+  - OCR은 **텍스트 추출만** 하고, 블라인드 좌표는 당분간 pdfjs만 사용합니다. (OCR bbox로 가리기는 추후 확장 가능)
+
 이미지 미리보기/압축/변환 없이 **병합·편집만** 쓰려면 `gs`/`pdfinfo` 없이도 동작합니다.
 
 금일 일감 정리 
