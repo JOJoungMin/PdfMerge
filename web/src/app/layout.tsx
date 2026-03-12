@@ -6,6 +6,7 @@ import { FileJson } from "lucide-react";
 import TransferSidebar from "@/widgets/transfer-sidebar/ui/TransferSidebar";
 import ResultCenterPreview from "@/widgets/transfer-sidebar/ui/ResultCenterPreview";
 import DownloadLoadingOverlay from "@/shared/ui/DownloadLoadingOverlay";
+import { Footer } from "@/shared/ui/Footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -38,6 +39,7 @@ export default function RootLayout({
           <main className="flex-grow">
             {children}
           </main>
+          <Footer />
         </div>
         <TransferSidebar />
         <ResultCenterPreview />

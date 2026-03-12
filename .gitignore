@@ -3,6 +3,16 @@ node_modules/
 .pnp
 .pnp.js
 
+# Python (Locust 등)
+.venv/
+backend/.venv/
+__pycache__/
+backend/loadtest/__pycache__/
+*.pyc
+
+# 부하테스트 샘플 PDF (용량 큼, 로컬/EC2에만 두고 Git 제외)
+backend/loadtest/*.pdf
+
 # Build
 .next/
 out/
@@ -34,8 +44,9 @@ npm-debug.log*
 pdfmerge/
 mysql-data/
 
-# DB 스키마 (로컬 실행용, Git 제외)
+# DB 스키마·초기화 스크립트 (로컬/배포 수동 실행용, Git 제외)
 backend/sql/
+backend/scripts/
 
 # Playwright
 test-results/
