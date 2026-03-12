@@ -27,7 +27,7 @@ test.describe('페이지 이동', () => {
 
     // 메인 페이지
     await expect(page.getByRole('heading', { name: 'PDF 유틸리티' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /PDF 병합/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /PDF 병합/ }).first()).toBeVisible();
 
     // 병합 페이지로
     await page.getByRole('link', { name: /PDF 병합/ }).first().click();
